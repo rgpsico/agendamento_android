@@ -92,6 +92,11 @@ body {
   background: var(--primary-dark);
 }
 
+.primary-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 .secondary-btn {
   background: #fff;
   border: 1px solid var(--border);
@@ -290,6 +295,39 @@ body {
   gap: 12px;
 }
 
+.table-wrap {
+  width: 100%;
+  overflow-x: auto;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+}
+
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 720px;
+}
+
+.data-table th,
+.data-table td {
+  padding: 12px 14px;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+  vertical-align: middle;
+}
+
+.data-table th {
+  background: #f1f6ff;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.data-table tr:last-child td {
+  border-bottom: none;
+}
+
 .list-item {
   background: var(--card);
   border: 1px solid var(--border);
@@ -319,6 +357,37 @@ body {
 .form-grid {
   display: grid;
   gap: 12px;
+}
+
+.service-thumb {
+  margin-top: 8px;
+  width: 120px;
+  height: 90px;
+  object-fit: cover;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+}
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(8, 17, 28, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  z-index: 5;
+}
+
+.modal-card {
+  background: var(--card);
+  width: min(640px, 100%);
+  border-radius: 16px;
+  padding: 20px;
+  display: grid;
+  gap: 16px;
+  border: 1px solid var(--border);
+  box-shadow: 0 20px 40px rgba(12, 24, 40, 0.2);
 }
 
 .status {

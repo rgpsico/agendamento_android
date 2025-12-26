@@ -12,7 +12,9 @@
           <span>Senha</span>
           <input type="password" v-model="loginForm.password" placeholder="******" />
         </label>
-        <button class="primary-btn" @click="handleLogin">Entrar</button>
+        <button class="primary-btn" :disabled="authLoading" @click="handleLogin">
+          {{ authLoading ? "Entrando..." : "Entrar" }}
+        </button>
         <button class="text-btn" @click="showForgot = !showForgot">Esqueci a senha</button>
         <p v-if="showForgot" class="hint">Funcionalidade em breve.</p>
         <p v-if="loginError" class="error">{{ loginError }}</p>
@@ -199,38 +201,101 @@
               <h3>Servicos</h3>
               <button class="primary-btn" @click="startNewService">Novo</button>
             </div>
-            <div class="list">
-              <div v-for="service in services" :key="service.id" class="list-item">
-                <div>
-                  <strong>{{ service.name }}</strong>
-                  <p>{{ service.description }}</p>
-                  <p>{{ service.duration }} min · R$ {{ service.price }}</p>
-                </div>
-                <div class="actions">
-                  <button class="text-btn" @click="editService(service)">Editar</button>
-                  <button class="text-btn danger" @click="removeService(service.id)">Remover</button>
-                </div>
-              </div>
+            <p v-if="servicesLoading" class="hint">Carregando servicos...</p>
+            <p v-if="servicesError" class="error">{{ servicesError }}</p>
+            <div class="table-wrap" v-if="services.length">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Titulo</th>
+                    <th>Descricao</th>
+                    <th>Preco</th>
+                    <th>Tempo</th>
+                    <th>Tipo</th>
+                    <th>Categoria</th>
+                    <th>Imagem</th>
+                    <th>Acoes</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="service in services" :key="service.id">
+                    <td>{{ service.titulo || "Servico" }}</td>
+                    <td>{{ service.descricao }}</td>
+                    <td>R$ {{ service.preco }}</td>
+                    <td>{{ service.tempo_de_aula }} min</td>
+                    <td>{{ service.tipo_agendamento }}</td>
+                    <td>{{ service.categoria_id || "-" }}</td>
+                    <td>
+                      <img
+                        v-if="service.imagem"
+                        class="service-thumb"
+                        :src="serviceImageUrl(service.imagem)"
+                        alt="Imagem do servico"
+                      />
+                      <span v-else>-</span>
+                    </td>
+                    <td>
+                      <div class="actions">
+                        <button class="text-btn" @click="editService(service)">Editar</button>
+                        <button class="text-btn danger" @click="removeService(service.id)">Excluir</button>
+                      </div>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
             </div>
+            <p v-if="!services.length && !servicesLoading" class="hint">Nenhum servico encontrado.</p>
+          </section>
 
-            <div class="form-card">
-              <h4>{{ serviceForm.id ? "Editar Servico" : "Novo Servico" }}</h4>
+          <div v-if="serviceModalOpen" class="modal-overlay" @click.self="closeServiceModal">
+            <div class="modal-card">
+              <div class="view-header">
+                <h4>{{ serviceForm.id ? "Editar Servico" : "Novo Servico" }}</h4>
+                <button class="text-btn" @click="closeServiceModal">Fechar</button>
+              </div>
+              <p v-if="categoriesLoading" class="hint">Carregando categorias...</p>
+              <p v-if="categoriesError" class="error">{{ categoriesError }}</p>
               <div class="form-grid">
                 <label class="field">
-                  <span>Nome</span>
-                  <input type="text" v-model.trim="serviceForm.name" />
+                  <span>Titulo</span>
+                  <input type="text" v-model.trim="serviceForm.titulo" />
                 </label>
                 <label class="field">
                   <span>Descricao</span>
-                  <input type="text" v-model.trim="serviceForm.description" />
-                </label>
-                <label class="field">
-                  <span>Duracao (min)</span>
-                  <input type="number" v-model.number="serviceForm.duration" />
+                  <input type="text" v-model.trim="serviceForm.descricao" />
                 </label>
                 <label class="field">
                   <span>Preco (R$)</span>
-                  <input type="number" v-model.number="serviceForm.price" />
+                  <input type="number" v-model.number="serviceForm.preco" />
+                </label>
+                <label class="field">
+                  <span>Tempo de Aula (min)</span>
+                  <input type="number" v-model.number="serviceForm.tempo_de_aula" />
+                </label>
+                <label class="field">
+                  <span>Tipo de Agendamento</span>
+                  <select v-model="serviceForm.tipo_agendamento">
+                    <option value="HORARIO">HORARIO</option>
+                    <option value="DIA">DIA</option>
+                  </select>
+                </label>
+                <label v-if="serviceForm.tipo_agendamento === 'DIA'" class="field">
+                  <span>Vagas por dia</span>
+                  <input type="number" v-model.number="serviceForm.vagas" min="1" />
+                </label>
+                <label class="field">
+                  <span>Categoria ID</span>
+                  <select v-model.number="serviceForm.categoria_id">
+                    <option :value="''">Selecione</option>
+                    <option v-for="cat in categories" :key="cat.id" :value="cat.id">
+                      {{ cat.nome || cat.id }}
+                    </option>
+                  </select>
+                </label>
+                <label class="field">
+                  <span>Imagem (URL)</span>
+                  <input type="file" accept="image/*" @change="onServiceImageChange" />
+                  <small class="hint">PNG/JPG ate 2MB.</small>
                 </label>
               </div>
               <div class="actions">
@@ -238,7 +303,7 @@
                 <button class="text-btn" @click="resetServiceForm">Limpar</button>
               </div>
             </div>
-          </section>
+          </div>
 
           <section v-if="currentTab === 'students'" class="view">
             <div class="view-header">
@@ -338,8 +403,11 @@
 </template>
 
 <script>
+const API_BASE = "https://agendamento.rjpasseios.com.br/api";
+
 const STORAGE = {
-  AUTH: "agenda_auth",
+  TOKEN: "agenda_token",
+  EMPRESA: "agenda_empresa_id",
   TEACHER: "agenda_teacher",
   APPOINTMENTS: "agenda_appointments",
   SERVICES: "agenda_services",
@@ -348,11 +416,7 @@ const STORAGE = {
 };
 
 const seedTeacher = { name: "Prof. Ana Silva", email: "prof@escola.com" };
-const seedServices = [
-  { id: 1, name: "Aula de Matematica", description: "Reforco escolar", duration: 60, price: 120 },
-  { id: 2, name: "Mentoria de Redacao", description: "Preparacao para vestibular", duration: 45, price: 90 },
-  { id: 3, name: "Consultoria Pedagogica", description: "Planejamento individual", duration: 90, price: 200 }
-];
+const seedServices = [];
 const seedStudents = [
   { id: 1, name: "Lucas Mendes", email: "lucas@email.com", phone: "(11) 99999-1111", history: "3 aulas" },
   { id: 2, name: "Mariana Costa", email: "mariana@email.com", phone: "(11) 99999-2222", history: "5 aulas" },
@@ -438,7 +502,8 @@ export default {
       },
       loginError: "",
       showForgot: false,
-      isAuthenticated: loadStorage(STORAGE.AUTH, false),
+      isAuthenticated: Boolean(localStorage.getItem(STORAGE.TOKEN)),
+      authLoading: false,
       currentTab: "dashboard",
       teacher: loadStorage(STORAGE.TEACHER, seedTeacher),
       services: loadStorage(STORAGE.SERVICES, seedServices),
@@ -464,10 +529,16 @@ export default {
       },
       serviceForm: {
         id: null,
-        name: "",
-        description: "",
-        duration: 60,
-        price: 100
+        empresa_id: loadStorage(STORAGE.EMPRESA, ""),
+        imagem: "",
+        imagemFile: null,
+        titulo: "",
+        descricao: "",
+        preco: "",
+        tempo_de_aula: "",
+        tipo_agendamento: "HORARIO",
+        vagas: "",
+        categoria_id: ""
       },
       studentForm: {
         id: null,
@@ -482,7 +553,13 @@ export default {
         end: ""
       },
       weekDays: ["Segunda", "Terca", "Quarta", "Quinta", "Sexta", "Sabado"],
-      showSidebar: false
+      showSidebar: false,
+      serviceModalOpen: false,
+      servicesLoading: false,
+      servicesError: "",
+      categories: [],
+      categoriesLoading: false,
+      categoriesError: ""
     };
   },
   computed: {
@@ -553,6 +630,10 @@ export default {
   },
   created() {
     this.seedStorage();
+    if (this.isAuthenticated) {
+      this.fetchServices();
+      this.fetchCategories();
+    }
   },
   methods: {
     seedStorage() {
@@ -571,19 +652,57 @@ export default {
     },
     handleLogin() {
       this.loginError = "";
-      if (this.loginForm.email === "prof@escola.com" && this.loginForm.password === "123456") {
-        this.isAuthenticated = true;
-        saveStorage(STORAGE.AUTH, true);
-        this.currentTab = "dashboard";
-        this.loginForm.email = "";
-        this.loginForm.password = "";
-      } else {
-        this.loginError = "Credenciais invalidas. Use prof@escola.com / 123456.";
+      if (!this.loginForm.email || !this.loginForm.password) {
+        this.loginError = "Informe email e senha.";
+        return;
       }
+      this.authLoading = true;
+      fetch("/api/login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          email: this.loginForm.email,
+          password: this.loginForm.password
+        })
+      })
+        .then(async (response) => {
+          const data = await response.json().catch(() => ({}));
+          if (!response.ok) {
+            throw new Error(data.error || "Falha na autenticacao.");
+          }
+          if (!data.token) {
+            throw new Error("Token nao recebido.");
+          }
+          localStorage.setItem(STORAGE.TOKEN, data.token);
+          if (data.empresa_id) {
+            localStorage.setItem(STORAGE.EMPRESA, data.empresa_id);
+            this.serviceForm.empresa_id = data.empresa_id;
+          }
+          this.isAuthenticated = true;
+          this.currentTab = "dashboard";
+          this.teacher = { ...this.teacher, email: this.loginForm.email };
+          this.fetchServices();
+          this.fetchCategories();
+          this.loginForm.email = "";
+          this.loginForm.password = "";
+        })
+        .catch((error) => {
+          this.loginError = error.message || "Erro ao autenticar.";
+        })
+        .finally(() => {
+          this.authLoading = false;
+        });
     },
     logout() {
       this.isAuthenticated = false;
-      saveStorage(STORAGE.AUTH, false);
+      localStorage.removeItem(STORAGE.TOKEN);
+      localStorage.removeItem(STORAGE.EMPRESA);
+    },
+    authHeaders() {
+      const token = localStorage.getItem(STORAGE.TOKEN);
+      return token ? { Authorization: `Bearer ${token}` } : {};
     },
     applyDashboardFilter() {
       this.activeDashboardStart = this.dashboardStart;
@@ -640,36 +759,172 @@ export default {
         status: "confirmado"
       };
     },
+    fetchServices() {
+      this.servicesLoading = true;
+      this.servicesError = "";
+      const empresaId = loadStorage(STORAGE.EMPRESA, "");
+      const endpoint = empresaId ? `/api/servicos/empresa/${empresaId}` : "/api/servicos";
+      fetch(endpoint, {
+        headers: {
+          "Content-Type": "application/json",
+          ...this.authHeaders()
+        }
+      })
+        .then(async (response) => {
+          const data = await response.json().catch(() => []);
+          if (!response.ok) {
+            throw new Error(data.error || "Erro ao carregar servicos.");
+          }
+          this.services = Array.isArray(data) ? data : [];
+          saveStorage(STORAGE.SERVICES, this.services);
+        })
+        .catch((error) => {
+          this.servicesError = error.message || "Erro ao carregar servicos.";
+        })
+        .finally(() => {
+          this.servicesLoading = false;
+        });
+    },
+    fetchCategories() {
+      this.categoriesLoading = true;
+      this.categoriesError = "";
+      fetch("/api/financeiro-categorias", {
+        headers: {
+          "Content-Type": "application/json",
+          ...this.authHeaders()
+        }
+      })
+        .then(async (response) => {
+          const data = await response.json().catch(() => []);
+          if (!response.ok) {
+            throw new Error(data.error || "Erro ao carregar categorias.");
+          }
+          this.categories = Array.isArray(data) ? data : [];
+        })
+        .catch((error) => {
+          this.categoriesError = error.message || "Erro ao carregar categorias.";
+        })
+        .finally(() => {
+          this.categoriesLoading = false;
+        });
+    },
     startNewService() {
       this.resetServiceForm();
+      this.serviceModalOpen = true;
     },
     editService(service) {
-      this.serviceForm = { ...service };
+      this.serviceForm = {
+        id: service.id,
+        empresa_id: service.empresa_id || "",
+        imagem: service.imagem || "",
+        imagemFile: null,
+        titulo: service.titulo || "",
+        descricao: service.descricao || "",
+        preco: service.preco || "",
+        tempo_de_aula: service.tempo_de_aula || "",
+        tipo_agendamento: service.tipo_agendamento || "HORARIO",
+        vagas: service.vagas || "",
+        categoria_id: service.categoria_id || ""
+      };
+      this.serviceModalOpen = true;
     },
     saveService() {
-      if (!this.serviceForm.name) return;
-      if (this.serviceForm.id) {
-        this.services = this.services.map((item) =>
-          item.id === this.serviceForm.id ? { ...this.serviceForm } : item
-        );
-      } else {
-        this.services = [...this.services, { ...this.serviceForm, id: Date.now() }];
+      const empresaId = this.serviceForm.empresa_id || loadStorage(STORAGE.EMPRESA, "");
+      if (!this.serviceForm.titulo || !empresaId) return;
+      if (!this.serviceForm.preco) return;
+      if (!this.serviceForm.tipo_agendamento) return;
+      const isEdit = Boolean(this.serviceForm.id);
+      const url = isEdit ? `/api/servicos/${this.serviceForm.id}` : "/api/servicos";
+      const formData = new FormData();
+      formData.append("empresa_id", empresaId);
+      formData.append("titulo", this.serviceForm.titulo);
+      formData.append("descricao", this.serviceForm.descricao || "");
+      formData.append("preco", this.serviceForm.preco);
+      formData.append("tempo_de_aula", this.serviceForm.tempo_de_aula || "");
+      formData.append("tipo_agendamento", this.serviceForm.tipo_agendamento);
+      if (this.serviceForm.tipo_agendamento === "DIA") {
+        formData.append("vagas", this.serviceForm.vagas || 1);
       }
-      saveStorage(STORAGE.SERVICES, this.services);
-      this.resetServiceForm();
+      if (this.serviceForm.categoria_id) {
+        formData.append("categoria_id", this.serviceForm.categoria_id);
+      }
+      if (this.serviceForm.imagemFile) {
+        formData.append("imagem", this.serviceForm.imagemFile);
+      }
+      if (isEdit) {
+        formData.append("_method", "PUT");
+      }
+      fetch(url, {
+        method: "POST",
+        headers: {
+          ...this.authHeaders()
+        },
+        body: formData
+      })
+        .then(async (response) => {
+          const data = await response.json().catch(() => ({}));
+          if (!response.ok) {
+            throw new Error(data.error || "Erro ao salvar servico.");
+          }
+          if (isEdit) {
+            this.services = this.services.map((item) => (item.id === data.id ? data : item));
+          } else {
+            this.services = [...this.services, data];
+          }
+          saveStorage(STORAGE.SERVICES, this.services);
+          this.closeServiceModal();
+        })
+        .catch((error) => {
+          this.servicesError = error.message || "Erro ao salvar servico.";
+        });
     },
     removeService(id) {
-      this.services = this.services.filter((item) => item.id !== id);
-      saveStorage(STORAGE.SERVICES, this.services);
+      fetch(`/api/servicos/${id}`, {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+          ...this.authHeaders()
+        }
+      })
+        .then(async (response) => {
+          const data = await response.json().catch(() => ({}));
+          if (!response.ok) {
+            throw new Error(data.error || "Erro ao remover servico.");
+          }
+          this.services = this.services.filter((item) => item.id !== id);
+          saveStorage(STORAGE.SERVICES, this.services);
+        })
+        .catch((error) => {
+          this.servicesError = error.message || "Erro ao remover servico.";
+        });
+    },
+    closeServiceModal() {
+      this.serviceModalOpen = false;
+      this.resetServiceForm();
     },
     resetServiceForm() {
       this.serviceForm = {
         id: null,
-        name: "",
-        description: "",
-        duration: 60,
-        price: 100
+        empresa_id: loadStorage(STORAGE.EMPRESA, ""),
+        imagem: "",
+        imagemFile: null,
+        titulo: "",
+        descricao: "",
+        preco: "",
+        tempo_de_aula: "",
+        tipo_agendamento: "HORARIO",
+        vagas: "",
+        categoria_id: ""
       };
+    },
+    onServiceImageChange(event) {
+      const file = event.target.files && event.target.files[0];
+      this.serviceForm.imagemFile = file || null;
+    },
+    serviceImageUrl(filename) {
+      if (!filename) return "";
+      if (filename.startsWith("http")) return filename;
+      return `https://agendamento.rjpasseios.com.br/servico/${filename}`;
     },
     startNewStudent() {
       this.resetStudentForm();
