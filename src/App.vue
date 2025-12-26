@@ -122,10 +122,16 @@
               <h3>Agendamentos</h3>
               <button class="primary-btn" @click="startNewAppointment">Novo</button>
             </div>
+            <p v-if="appointmentsLoading" class="hint">Carregando agendamentos...</p>
+            <p v-if="appointmentsError" class="error">{{ appointmentsError }}</p>
             <div class="filter-row">
               <label class="field small">
-                <span>Data</span>
-                <input type="date" v-model="appointmentsFilter.date" />
+                <span>Data Inicio</span>
+                <input type="date" v-model="appointmentsFilter.start" />
+              </label>
+              <label class="field small">
+                <span>Data Fim</span>
+                <input type="date" v-model="appointmentsFilter.end" />
               </label>
               <label class="field small">
                 <span>Status</span>
@@ -137,22 +143,46 @@
                 </select>
               </label>
             </div>
-            <div class="list">
-              <div v-for="appt in filteredAppointments" :key="appt.id" class="list-item">
-                <div>
-                  <strong>{{ appt.date }} · {{ appt.time }}</strong>
-                  <p>{{ appt.studentName }} · {{ appt.serviceName }}</p>
-                </div>
-                <div class="actions">
-                  <button class="text-btn" @click="editAppointment(appt)">Editar</button>
-                  <button class="text-btn danger" @click="cancelAppointment(appt.id)">Cancelar</button>
-                </div>
-              </div>
-              <p v-if="!filteredAppointments.length" class="hint">Nenhum agendamento encontrado.</p>
+            <div class="table-wrap" v-if="filteredAppointments.length">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Data</th>
+                    <th>Hora</th>
+                    <th>Aluno</th>
+                    <th>Servico</th>
+                    <th>Status</th>
+                    <th>Acoes</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="appt in filteredAppointments" :key="appt.id">
+                    <td>{{ appt.date }}</td>
+                    <td>{{ appt.time }}</td>
+                    <td>{{ appt.studentName }}</td>
+                    <td>{{ appt.serviceName }}</td>
+                    <td>
+                      <span class="status" :class="appt.status">{{ appt.status }}</span>
+                    </td>
+                    <td>
+                      <div class="actions">
+                        <button class="text-btn" @click="editAppointment(appt)">Editar</button>
+                        <button class="text-btn danger" @click="cancelAppointment(appt.id)">Cancelar</button>
+                      </div>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
             </div>
+            <p v-if="!filteredAppointments.length" class="hint">Nenhum agendamento encontrado.</p>
+          </section>
 
-            <div class="form-card">
-              <h4>{{ appointmentForm.id ? "Editar Agendamento" : "Novo Agendamento" }}</h4>
+          <div v-if="appointmentModalOpen" class="modal-overlay" @click.self="closeAppointmentModal">
+            <div class="modal-card">
+              <div class="view-header">
+                <h4>{{ appointmentForm.id ? "Editar Agendamento" : "Novo Agendamento" }}</h4>
+                <button class="text-btn" @click="closeAppointmentModal">Fechar</button>
+              </div>
               <div class="form-grid">
                 <label class="field">
                   <span>Data</span>
@@ -176,7 +206,7 @@
                   <select v-model="appointmentForm.serviceId">
                     <option disabled value="">Selecione</option>
                     <option v-for="service in services" :key="service.id" :value="service.id">
-                      {{ service.name }}
+                      {{ service.titulo || service.name }}
                     </option>
                   </select>
                 </label>
@@ -194,7 +224,7 @@
                 <button class="text-btn" @click="resetAppointmentForm">Limpar</button>
               </div>
             </div>
-          </section>
+          </div>
 
           <section v-if="currentTab === 'services'" class="view">
             <div class="view-header">
@@ -516,7 +546,8 @@ export default {
       activeDashboardEnd: "",
       activeDay: "",
       appointmentsFilter: {
-        date: "",
+        start: "",
+        end: "",
         status: ""
       },
       appointmentForm: {
@@ -557,6 +588,9 @@ export default {
       serviceModalOpen: false,
       servicesLoading: false,
       servicesError: "",
+      appointmentsLoading: false,
+      appointmentsError: "",
+      appointmentModalOpen: false,
       categories: [],
       categoriesLoading: false,
       categoriesError: ""
@@ -564,25 +598,18 @@ export default {
   },
   computed: {
     appointmentsDetailed() {
-      return this.appointments.map((appt) => {
-        const student = this.students.find((item) => item.id === appt.studentId);
-        const service = this.services.find((item) => item.id === appt.serviceId);
-        return {
-          ...appt,
-          studentName: student ? student.name : "Aluno",
-          serviceName: service ? service.name : "Servico"
-        };
-      });
+      return this.appointments.map((appt) => this.normalizeAppointment(appt));
     },
     filteredAppointments() {
       return this.appointmentsDetailed.filter((appt) => {
-        const matchesDate = this.appointmentsFilter.date
-          ? appt.date === this.appointmentsFilter.date
+        const matchesStart = this.appointmentsFilter.start
+          ? appt.date >= this.appointmentsFilter.start
           : true;
+        const matchesEnd = this.appointmentsFilter.end ? appt.date <= this.appointmentsFilter.end : true;
         const matchesStatus = this.appointmentsFilter.status
           ? appt.status === this.appointmentsFilter.status
           : true;
-        return matchesDate && matchesStatus;
+        return matchesStart && matchesEnd && matchesStatus;
       });
     },
     dashboardAppointments() {
@@ -633,6 +660,7 @@ export default {
     if (this.isAuthenticated) {
       this.fetchServices();
       this.fetchCategories();
+      this.fetchAppointments();
     }
   },
   methods: {
@@ -685,6 +713,7 @@ export default {
           this.teacher = { ...this.teacher, email: this.loginForm.email };
           this.fetchServices();
           this.fetchCategories();
+          this.fetchAppointments();
           this.loginForm.email = "";
           this.loginForm.password = "";
         })
@@ -704,6 +733,55 @@ export default {
       const token = localStorage.getItem(STORAGE.TOKEN);
       return token ? { Authorization: `Bearer ${token}` } : {};
     },
+    normalizeAppointment(appt) {
+      const date = appt.date || appt.data || appt.data_agendamento || "";
+      const time = appt.time || appt.hora || appt.horario || "";
+      const status = appt.status || appt.situacao || "confirmado";
+      const serviceName =
+        appt.servico?.titulo ||
+        appt.servico?.nome ||
+        appt.serviceName ||
+        "Servico";
+      const studentName =
+        appt.aluno?.usuario?.nome ||
+        appt.aluno?.nome ||
+        appt.studentName ||
+        "Aluno";
+      return {
+        ...appt,
+        date,
+        time,
+        status,
+        studentName,
+        serviceName
+      };
+    },
+    fetchAppointments() {
+      const empresaId = loadStorage(STORAGE.EMPRESA, "");
+      if (!empresaId) return;
+      this.appointmentsLoading = true;
+      this.appointmentsError = "";
+      fetch(`/api/agendamento/empresa/${empresaId}`, {
+        headers: {
+          "Content-Type": "application/json",
+          ...this.authHeaders()
+        }
+      })
+        .then(async (response) => {
+          const data = await response.json().catch(() => []);
+          if (!response.ok) {
+            throw new Error(data.error || "Erro ao carregar agendamentos.");
+          }
+          this.appointments = Array.isArray(data) ? data : [];
+          saveStorage(STORAGE.APPOINTMENTS, this.appointments);
+        })
+        .catch((error) => {
+          this.appointmentsError = error.message || "Erro ao carregar agendamentos.";
+        })
+        .finally(() => {
+          this.appointmentsLoading = false;
+        });
+    },
     applyDashboardFilter() {
       this.activeDashboardStart = this.dashboardStart;
       this.activeDashboardEnd = this.dashboardEnd;
@@ -715,6 +793,7 @@ export default {
     },
     startNewAppointment() {
       this.resetAppointmentForm();
+      this.appointmentModalOpen = true;
     },
     editAppointment(appt) {
       this.appointmentForm = {
@@ -725,6 +804,7 @@ export default {
         serviceId: appt.serviceId,
         status: appt.status
       };
+      this.appointmentModalOpen = true;
     },
     saveAppointment() {
       if (!this.appointmentForm.date || !this.appointmentForm.time) return;
@@ -741,7 +821,7 @@ export default {
         this.appointments = [...this.appointments, updated];
       }
       saveStorage(STORAGE.APPOINTMENTS, this.appointments);
-      this.resetAppointmentForm();
+      this.closeAppointmentModal();
     },
     cancelAppointment(id) {
       this.appointments = this.appointments.map((appt) =>
@@ -758,6 +838,10 @@ export default {
         serviceId: "",
         status: "confirmado"
       };
+    },
+    closeAppointmentModal() {
+      this.appointmentModalOpen = false;
+      this.resetAppointmentForm();
     },
     fetchServices() {
       this.servicesLoading = true;

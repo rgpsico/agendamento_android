@@ -1,0 +1,25 @@
+# Node / Vue
+node_modules/
+dist/
+
+# Logs
+*.log
+logs/
+
+# Env / local config
+.env
+.env.*
+
+# OS / editor
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+.idea/
+.vscode/
+
+# Laragon / local
+.laragon/
+composer.lock
+vendor/
+
