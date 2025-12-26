@@ -340,26 +340,52 @@
               <h3>Alunos</h3>
               <button class="primary-btn" @click="startNewStudent">Novo</button>
             </div>
-            <div class="list">
-              <div v-for="student in students" :key="student.id" class="list-item">
-                <div>
-                  <strong>{{ student.name }}</strong>
-                  <p>{{ student.email }} · {{ student.phone }}</p>
-                  <p>Historico: {{ student.history }}</p>
-                </div>
-                <div class="actions">
-                  <button class="text-btn" @click="editStudent(student)">Editar</button>
-                  <button class="text-btn danger" @click="removeStudent(student.id)">Remover</button>
-                </div>
-              </div>
+            <p v-if="studentsLoading" class="hint">Carregando alunos...</p>
+            <p v-if="studentsError" class="error">{{ studentsError }}</p>
+            <div class="table-wrap" v-if="studentsDetailed.length">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Nome</th>
+                    <th>Email</th>
+                    <th>Telefone</th>
+                    <th>Data Nascimento</th>
+                    <th>Acoes</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="student in studentsDetailed" :key="student.id">
+                    <td>{{ student.nome }}</td>
+                    <td>{{ student.email }}</td>
+                    <td>{{ student.telefone }}</td>
+                    <td>{{ student.data_nascimento }}</td>
+                    <td>
+                      <div class="actions">
+                        <button class="text-btn" @click="editStudent(student)">Editar</button>
+                        <button class="text-btn danger" @click="removeStudent(student.id)">Excluir</button>
+                      </div>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
             </div>
+            <p v-if="!studentsDetailed.length" class="hint">Nenhum aluno encontrado.</p>
+          </section>
 
-            <div class="form-card">
-              <h4>{{ studentForm.id ? "Editar Aluno" : "Novo Aluno" }}</h4>
+          <div v-if="studentModalOpen" class="modal-overlay" @click.self="closeStudentModal">
+            <div class="modal-card">
+              <div class="view-header">
+                <h4>{{ studentForm.id ? "Editar Aluno" : "Novo Aluno" }}</h4>
+                <button class="text-btn" @click="closeStudentModal">Fechar</button>
+              </div>
               <div class="form-grid">
                 <label class="field">
-                  <span>Nome</span>
-                  <input type="text" v-model.trim="studentForm.name" />
+                  <span>Primeiro Nome</span>
+                  <input type="text" v-model.trim="studentForm.primeiro_nome" />
+                </label>
+                <label class="field">
+                  <span>Ultimo Nome</span>
+                  <input type="text" v-model.trim="studentForm.ultimo_nome" />
                 </label>
                 <label class="field">
                   <span>Email</span>
@@ -367,11 +393,15 @@
                 </label>
                 <label class="field">
                   <span>Telefone</span>
-                  <input type="text" v-model.trim="studentForm.phone" />
+                  <input type="text" v-model.trim="studentForm.telefone" />
                 </label>
                 <label class="field">
-                  <span>Historico</span>
-                  <input type="text" v-model.trim="studentForm.history" />
+                  <span>Data de Nascimento</span>
+                  <input type="date" v-model="studentForm.data_nascimento" />
+                </label>
+                <label v-if="!studentForm.id" class="field">
+                  <span>Senha</span>
+                  <input type="password" v-model.trim="studentForm.password" />
                 </label>
               </div>
               <div class="actions">
@@ -379,7 +409,7 @@
                 <button class="text-btn" @click="resetStudentForm">Limpar</button>
               </div>
             </div>
-          </section>
+          </div>
 
           <section v-if="currentTab === 'availability'" class="view">
             <div class="view-header">
@@ -438,6 +468,7 @@ const API_BASE = "https://agendamento.rjpasseios.com.br/api";
 const STORAGE = {
   TOKEN: "agenda_token",
   EMPRESA: "agenda_empresa_id",
+  PROFESSOR: "agenda_professor_id",
   TEACHER: "agenda_teacher",
   APPOINTMENTS: "agenda_appointments",
   SERVICES: "agenda_services",
@@ -573,10 +604,12 @@ export default {
       },
       studentForm: {
         id: null,
-        name: "",
+        primeiro_nome: "",
+        ultimo_nome: "",
         email: "",
-        phone: "",
-        history: ""
+        telefone: "",
+        data_nascimento: "",
+        password: ""
       },
       availabilityForm: {
         day: "",
@@ -591,6 +624,9 @@ export default {
       appointmentsLoading: false,
       appointmentsError: "",
       appointmentModalOpen: false,
+      studentsLoading: false,
+      studentsError: "",
+      studentModalOpen: false,
       categories: [],
       categoriesLoading: false,
       categoriesError: ""
@@ -599,6 +635,9 @@ export default {
   computed: {
     appointmentsDetailed() {
       return this.appointments.map((appt) => this.normalizeAppointment(appt));
+    },
+    studentsDetailed() {
+      return this.students.map((student) => this.normalizeStudent(student));
     },
     filteredAppointments() {
       return this.appointmentsDetailed.filter((appt) => {
@@ -661,6 +700,7 @@ export default {
       this.fetchServices();
       this.fetchCategories();
       this.fetchAppointments();
+      this.fetchStudents();
     }
   },
   methods: {
@@ -708,12 +748,16 @@ export default {
             localStorage.setItem(STORAGE.EMPRESA, data.empresa_id);
             this.serviceForm.empresa_id = data.empresa_id;
           }
+          if (data.professor_id) {
+            localStorage.setItem(STORAGE.PROFESSOR, data.professor_id);
+          }
           this.isAuthenticated = true;
           this.currentTab = "dashboard";
           this.teacher = { ...this.teacher, email: this.loginForm.email };
           this.fetchServices();
           this.fetchCategories();
           this.fetchAppointments();
+          this.fetchStudents();
           this.loginForm.email = "";
           this.loginForm.password = "";
         })
@@ -728,15 +772,28 @@ export default {
       this.isAuthenticated = false;
       localStorage.removeItem(STORAGE.TOKEN);
       localStorage.removeItem(STORAGE.EMPRESA);
+      localStorage.removeItem(STORAGE.PROFESSOR);
     },
     authHeaders() {
       const token = localStorage.getItem(STORAGE.TOKEN);
       return token ? { Authorization: `Bearer ${token}` } : {};
     },
+    normalizeStudent(student) {
+      const user = student.usuario || student;
+      return {
+        id: user.id || student.id,
+        nome: user.nome || student.nome || "",
+        email: user.email || student.email || "",
+        telefone: user.telefone || student.telefone || "",
+        data_nascimento: user.data_nascimento || student.data_nascimento || ""
+      };
+    },
     normalizeAppointment(appt) {
       const date = appt.date || appt.data || appt.data_agendamento || "";
       const time = appt.time || appt.hora || appt.horario || "";
       const status = appt.status || appt.situacao || "confirmado";
+      const serviceId = appt.serviceId || appt.servico_id || appt.servico?.id || "";
+      const studentId = appt.studentId || appt.aluno_id || appt.aluno?.id || "";
       const serviceName =
         appt.servico?.titulo ||
         appt.servico?.nome ||
@@ -752,6 +809,8 @@ export default {
         date,
         time,
         status,
+        serviceId,
+        studentId,
         studentName,
         serviceName
       };
@@ -780,6 +839,32 @@ export default {
         })
         .finally(() => {
           this.appointmentsLoading = false;
+        });
+    },
+    fetchStudents() {
+      const empresaId = loadStorage(STORAGE.EMPRESA, "");
+      if (!empresaId) return;
+      this.studentsLoading = true;
+      this.studentsError = "";
+      fetch(`/api/alunos/empresa/${empresaId}`, {
+        headers: {
+          "Content-Type": "application/json",
+          ...this.authHeaders()
+        }
+      })
+        .then(async (response) => {
+          const data = await response.json().catch(() => []);
+          if (!response.ok) {
+            throw new Error(data.error || "Erro ao carregar alunos.");
+          }
+          this.students = Array.isArray(data) ? data : [];
+          saveStorage(STORAGE.STUDENTS, this.students);
+        })
+        .catch((error) => {
+          this.studentsError = error.message || "Erro ao carregar alunos.";
+        })
+        .finally(() => {
+          this.studentsLoading = false;
         });
     },
     applyDashboardFilter() {
@@ -1012,33 +1097,108 @@ export default {
     },
     startNewStudent() {
       this.resetStudentForm();
+      this.studentModalOpen = true;
     },
     editStudent(student) {
-      this.studentForm = { ...student };
+      const nome = student.nome || "";
+      const parts = nome.trim().split(/\s+/);
+      const primeiroNome = parts.shift() || "";
+      const ultimoNome = parts.join(" ");
+      this.studentForm = {
+        id: student.id,
+        primeiro_nome: primeiroNome,
+        ultimo_nome: ultimoNome,
+        email: student.email || "",
+        telefone: student.telefone || "",
+        data_nascimento: student.data_nascimento || "",
+        password: ""
+      };
+      this.studentModalOpen = true;
     },
     saveStudent() {
-      if (!this.studentForm.name) return;
-      if (this.studentForm.id) {
-        this.students = this.students.map((item) =>
-          item.id === this.studentForm.id ? { ...this.studentForm } : item
-        );
-      } else {
-        this.students = [...this.students, { ...this.studentForm, id: Date.now() }];
-      }
-      saveStorage(STORAGE.STUDENTS, this.students);
-      this.resetStudentForm();
+      if (!this.studentForm.primeiro_nome || !this.studentForm.email) return;
+      const isEdit = Boolean(this.studentForm.id);
+      const url = isEdit ? `/api/aluno/${this.studentForm.id}/update` : "/api/aluno/store";
+      const payload = isEdit
+        ? {
+            primeiro_nome: this.studentForm.primeiro_nome,
+            ultimo_nome: this.studentForm.ultimo_nome,
+            data_nascimento: this.studentForm.data_nascimento,
+            email: this.studentForm.email,
+            telefone: this.studentForm.telefone
+          }
+        : {
+            nome: `${this.studentForm.primeiro_nome} ${this.studentForm.ultimo_nome}`.trim(),
+            email: this.studentForm.email,
+            password: this.studentForm.password,
+            tipo_usuario: "aluno",
+            data_nascimento: this.studentForm.data_nascimento,
+            telefone: this.studentForm.telefone
+          };
+      if (!isEdit && !this.studentForm.password) return;
+      fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...this.authHeaders()
+        },
+        body: JSON.stringify(payload)
+      })
+        .then(async (response) => {
+          const data = await response.json().catch(() => ({}));
+          if (!response.ok) {
+            throw new Error(data.error || "Erro ao salvar aluno.");
+          }
+          if (isEdit) {
+            this.students = this.students.map((item) => (item.id === data.id ? data : item));
+          } else {
+            this.students = [...this.students, data];
+          }
+          saveStorage(STORAGE.STUDENTS, this.students);
+          this.closeStudentModal();
+        })
+        .catch((error) => {
+          this.studentsError = error.message || "Erro ao salvar aluno.";
+        });
     },
     removeStudent(id) {
-      this.students = this.students.filter((item) => item.id !== id);
-      saveStorage(STORAGE.STUDENTS, this.students);
+      const professorId = loadStorage(STORAGE.PROFESSOR, "");
+      if (!professorId) {
+        this.studentsError = "Professor nao encontrado para excluir aluno.";
+        return;
+      }
+      fetch(`/api/aluno/${id}/destroy/${professorId}`, {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+          ...this.authHeaders()
+        }
+      })
+        .then(async (response) => {
+          const data = await response.json().catch(() => ({}));
+          if (!response.ok) {
+            throw new Error(data.error || "Erro ao remover aluno.");
+          }
+          this.students = this.students.filter((item) => item.id !== id);
+          saveStorage(STORAGE.STUDENTS, this.students);
+        })
+        .catch((error) => {
+          this.studentsError = error.message || "Erro ao remover aluno.";
+        });
+    },
+    closeStudentModal() {
+      this.studentModalOpen = false;
+      this.resetStudentForm();
     },
     resetStudentForm() {
       this.studentForm = {
         id: null,
-        name: "",
+        primeiro_nome: "",
+        ultimo_nome: "",
         email: "",
-        phone: "",
-        history: ""
+        telefone: "",
+        data_nascimento: "",
+        password: ""
       };
     },
     startNewAvailability() {
