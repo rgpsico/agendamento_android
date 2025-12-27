@@ -1,0 +1,9 @@
+{
+  "appId": "com.agendappg.app",
+  "appName": "agenda-app-ppg",
+  "webDir": "dist",
+  "server": {
+    "cleartext": true,
+    "allowNavigation": ["*"]
+  }
+}

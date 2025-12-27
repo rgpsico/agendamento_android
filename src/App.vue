@@ -725,7 +725,7 @@ export default {
         return;
       }
       this.authLoading = true;
-      fetch("/api/login", {
+      fetch(API_BASE+"/api/login", {
         method: "POST",
         headers: {
           "Content-Type": "application/json"
