@@ -1,468 +1,157 @@
 <template>
   <div class="app-shell">
-    <div v-if="!isAuthenticated" class="login-screen">
-      <div class="login-card">
-        <h1>Agenda Pro</h1>
-        <p class="subtitle">Acesso do Professor</p>
-        <label class="field">
-          <span>Email</span>
-          <input type="email" v-model.trim="loginForm.email" placeholder="prof@escola.com" />
-        </label>
-        <label class="field">
-          <span>Senha</span>
-          <input type="password" v-model="loginForm.password" placeholder="******" />
-        </label>
-        <button class="primary-btn" :disabled="authLoading" @click="handleLogin">
-          {{ authLoading ? "Entrando..." : "Entrar" }}
-        </button>
-        <button class="text-btn" @click="showForgot = !showForgot">Esqueci a senha</button>
-        <p v-if="showForgot" class="hint">Funcionalidade em breve.</p>
-        <p v-if="loginError" class="error">{{ loginError }}</p>
-      </div>
-    </div>
+    <LoginScreen
+      v-if="!isAuthenticated && !clientAuthenticated"
+      :active-portal="activePortal"
+      :login-form="loginForm"
+      :client-login-form="clientLoginForm"
+      :auth-loading="authLoading"
+      :client-loading="clientLoading"
+      :login-error="loginError"
+      :client-login-error="clientLoginError"
+      :show-forgot="showForgot"
+      @set-portal="activePortal = $event"
+      @toggle-forgot="showForgot = !showForgot"
+      @login="handleLogin"
+      @client-login="handleClientLogin"
+    />
 
-    <div v-else class="app-layout">
-      <div v-if="showSidebar" class="sidebar-backdrop" @click="showSidebar = false"></div>
-      <aside class="sidebar" :class="{ open: showSidebar }">
-        <div class="sidebar-header">
-          <h1>Agenda Pro</h1>
-          <p class="subtitle">Menu Principal</p>
-        </div>
-        <nav class="sidebar-nav">
-          <button :class="{ active: currentTab === 'dashboard' }" @click="goToTab('dashboard')">
-            Dashboard
-          </button>
-          <button :class="{ active: currentTab === 'appointments' }" @click="goToTab('appointments')">
-            Agendamentos
-          </button>
-          <button :class="{ active: currentTab === 'services' }" @click="goToTab('services')">
-            Servicos
-          </button>
-          <button :class="{ active: currentTab === 'students' }" @click="goToTab('students')">
-            Alunos
-          </button>
-          <button :class="{ active: currentTab === 'availability' }" @click="goToTab('availability')">
-            Horarios
-          </button>
-        </nav>
-      </aside>
+    <ProfessorPortal
+      v-else-if="isAuthenticated && activePortal === 'professor'"
+      :show-sidebar="showSidebar"
+      :current-tab="currentTab"
+      :teacher="teacher"
+      :dashboard-start="dashboardStart"
+      :dashboard-end="dashboardEnd"
+      :day-appointments="dayAppointments"
+      :active-day-label="activeDayLabel"
+      :month-appointments="monthAppointments"
+      :active-month-label="activeMonthLabel"
+      :grouped-by-date="groupedByDate"
+      :appointments-loading="appointmentsLoading"
+      :appointments-error="appointmentsError"
+      :appointments-filter="appointmentsFilter"
+      :filtered-appointments="filteredAppointments"
+      :appointment-modal-open="appointmentModalOpen"
+      :appointment-form="appointmentForm"
+      :students="students"
+      :services="services"
+      :service-modal-open="serviceModalOpen"
+      :service-form="serviceForm"
+      :categories-loading="categoriesLoading"
+      :categories-error="categoriesError"
+      :categories="categories"
+      :students-loading="studentsLoading"
+      :students-error="studentsError"
+      :students-detailed="studentsDetailed"
+      :student-modal-open="studentModalOpen"
+      :student-form="studentForm"
+      :availability-query="availabilityQuery"
+      :availability-day-label="availabilityDayLabel"
+      :availability-mode="availabilityMode"
+      :availability-loading="availabilityLoading"
+      :availability-error="availabilityError"
+      :availability-slots="availabilitySlots"
+      :contracted-loading="contractedLoading"
+      :contracted-error="contractedError"
+      :contracted-slots="contractedSlots"
+      :toggle-sidebar="toggleSidebar"
+      :close-sidebar="closeSidebar"
+      :go-to-tab="goToTab"
+      :logout="logout"
+      :apply-dashboard-filter="applyDashboardFilter"
+      :open-day-schedule="openDaySchedule"
+      :start-new-appointment="startNewAppointment"
+      :edit-appointment="editAppointment"
+      :cancel-appointment="cancelAppointment"
+      :close-appointment-modal="closeAppointmentModal"
+      :save-appointment="saveAppointment"
+      :reset-appointment-form="resetAppointmentForm"
+      :start-new-service="startNewService"
+      :edit-service="editService"
+      :remove-service="removeService"
+      :close-service-modal="closeServiceModal"
+      :save-service="saveService"
+      :reset-service-form="resetServiceForm"
+      :on-service-image-change="onServiceImageChange"
+      :service-image-url="serviceImageUrl"
+      :start-new-student="startNewStudent"
+      :edit-student="editStudent"
+      :remove-student="removeStudent"
+      :close-student-modal="closeStudentModal"
+      :save-student="saveStudent"
+      :reset-student-form="resetStudentForm"
+      :fetch-availability="fetchAvailability"
+      :set-dashboard-start="setDashboardStart"
+      :set-dashboard-end="setDashboardEnd"
+      :set-availability-mode="setAvailabilityMode"
+    />
 
-      <div class="app-main">
-        <header class="topbar">
-          <button class="icon-btn" @click="toggleSidebar">Menu</button>
-          <div class="topbar-info">
-            <p class="label">Professor</p>
-            <h2>{{ teacher.name }}</h2>
-          </div>
-          <button class="secondary-btn" @click="logout">Logout</button>
-        </header>
-
-        <main class="content">
-          <section v-if="currentTab === 'dashboard'" class="view">
-            <h3>Dashboard</h3>
-            <div class="filter-row">
-              <label class="field small">
-                <span>Data Inicio</span>
-                <input type="date" v-model="dashboardStart" />
-              </label>
-              <label class="field small">
-                <span>Data Final</span>
-                <input type="date" v-model="dashboardEnd" />
-              </label>
-              <button class="primary-btn" @click="applyDashboardFilter">Filtrar</button>
-            </div>
-
-            <div class="cards">
-              <div class="card clickable" @click="openDaySchedule">
-                <p class="card-title">Agendamentos do Dia</p>
-                <p class="card-value">{{ dayAppointments.length }}</p>
-                <p class="card-subtitle">{{ activeDayLabel }}</p>
-              </div>
-              <div class="card">
-                <p class="card-title">Numero de Agendamentos no Mes</p>
-                <p class="card-value">{{ monthAppointments.length }}</p>
-                <p class="card-subtitle">{{ activeMonthLabel }}</p>
-              </div>
-              <div class="card">
-                <p class="card-title">Agendamentos por Periodo</p>
-                <div class="mini-chart">
-                  <div v-for="item in groupedByDate" :key="item.date" class="chart-row">
-                    <span>{{ item.label }}</span>
-                    <div class="bar">
-                      <span :style="{ width: item.count * 12 + 'px' }"></span>
-                    </div>
-                    <strong>{{ item.count }}</strong>
-                  </div>
-                  <p v-if="!groupedByDate.length" class="hint">Sem dados no periodo.</p>
-                </div>
-              </div>
-            </div>
-          </section>
-
-          <section v-if="currentTab === 'daySchedule'" class="view">
-            <div class="view-header">
-              <h3>Agendamentos do Dia</h3>
-              <button class="text-btn" @click="currentTab = 'dashboard'">Voltar</button>
-            </div>
-            <p class="subtitle">{{ activeDayLabel }}</p>
-            <div v-if="dayAppointments.length" class="list">
-              <div v-for="appt in dayAppointments" :key="appt.id" class="list-item">
-                <div>
-                  <strong>{{ appt.time }}</strong>
-                  <p>{{ appt.studentName }} · {{ appt.serviceName }}</p>
-                </div>
-                <span class="status" :class="appt.status">{{ appt.status }}</span>
-              </div>
-            </div>
-            <p v-else class="hint">Nenhum agendamento encontrado.</p>
-          </section>
-
-          <section v-if="currentTab === 'appointments'" class="view">
-            <div class="view-header">
-              <h3>Agendamentos</h3>
-              <button class="primary-btn" @click="startNewAppointment">Novo</button>
-            </div>
-            <p v-if="appointmentsLoading" class="hint">Carregando agendamentos...</p>
-            <p v-if="appointmentsError" class="error">{{ appointmentsError }}</p>
-            <div class="filter-row">
-              <label class="field small">
-                <span>Data Inicio</span>
-                <input type="date" v-model="appointmentsFilter.start" />
-              </label>
-              <label class="field small">
-                <span>Data Fim</span>
-                <input type="date" v-model="appointmentsFilter.end" />
-              </label>
-              <label class="field small">
-                <span>Status</span>
-                <select v-model="appointmentsFilter.status">
-                  <option value="">Todos</option>
-                  <option value="confirmado">Confirmado</option>
-                  <option value="pendente">Pendente</option>
-                  <option value="cancelado">Cancelado</option>
-                </select>
-              </label>
-            </div>
-            <div class="table-wrap" v-if="filteredAppointments.length">
-              <table class="data-table">
-                <thead>
-                  <tr>
-                    <th>Data</th>
-                    <th>Hora</th>
-                    <th>Aluno</th>
-                    <th>Servico</th>
-                    <th>Status</th>
-                    <th>Acoes</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr v-for="appt in filteredAppointments" :key="appt.id">
-                    <td>{{ appt.date }}</td>
-                    <td>{{ appt.time }}</td>
-                    <td>{{ appt.studentName }}</td>
-                    <td>{{ appt.serviceName }}</td>
-                    <td>
-                      <span class="status" :class="appt.status">{{ appt.status }}</span>
-                    </td>
-                    <td>
-                      <div class="actions">
-                        <button class="text-btn" @click="editAppointment(appt)">Editar</button>
-                        <button class="text-btn danger" @click="cancelAppointment(appt.id)">Cancelar</button>
-                      </div>
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-            <p v-if="!filteredAppointments.length" class="hint">Nenhum agendamento encontrado.</p>
-          </section>
-
-          <div v-if="appointmentModalOpen" class="modal-overlay" @click.self="closeAppointmentModal">
-            <div class="modal-card">
-              <div class="view-header">
-                <h4>{{ appointmentForm.id ? "Editar Agendamento" : "Novo Agendamento" }}</h4>
-                <button class="text-btn" @click="closeAppointmentModal">Fechar</button>
-              </div>
-              <div class="form-grid">
-                <label class="field">
-                  <span>Data</span>
-                  <input type="date" v-model="appointmentForm.date" />
-                </label>
-                <label class="field">
-                  <span>Hora</span>
-                  <input type="time" v-model="appointmentForm.time" />
-                </label>
-                <label class="field">
-                  <span>Aluno</span>
-                  <select v-model="appointmentForm.studentId">
-                    <option disabled value="">Selecione</option>
-                    <option v-for="student in students" :key="student.id" :value="student.id">
-                      {{ student.name }}
-                    </option>
-                  </select>
-                </label>
-                <label class="field">
-                  <span>Servico</span>
-                  <select v-model="appointmentForm.serviceId">
-                    <option disabled value="">Selecione</option>
-                    <option v-for="service in services" :key="service.id" :value="service.id">
-                      {{ service.titulo || service.name }}
-                    </option>
-                  </select>
-                </label>
-                <label class="field">
-                  <span>Status</span>
-                  <select v-model="appointmentForm.status">
-                    <option value="confirmado">Confirmado</option>
-                    <option value="pendente">Pendente</option>
-                    <option value="cancelado">Cancelado</option>
-                  </select>
-                </label>
-              </div>
-              <div class="actions">
-                <button class="primary-btn" @click="saveAppointment">Salvar</button>
-                <button class="text-btn" @click="resetAppointmentForm">Limpar</button>
-              </div>
-            </div>
-          </div>
-
-          <section v-if="currentTab === 'services'" class="view">
-            <div class="view-header">
-              <h3>Servicos</h3>
-              <button class="primary-btn" @click="startNewService">Novo</button>
-            </div>
-            <p v-if="servicesLoading" class="hint">Carregando servicos...</p>
-            <p v-if="servicesError" class="error">{{ servicesError }}</p>
-            <div class="table-wrap" v-if="services.length">
-              <table class="data-table">
-                <thead>
-                  <tr>
-                    <th>Titulo</th>
-                    <th>Descricao</th>
-                    <th>Preco</th>
-                    <th>Tempo</th>
-                    <th>Tipo</th>
-                    <th>Categoria</th>
-                    <th>Imagem</th>
-                    <th>Acoes</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr v-for="service in services" :key="service.id">
-                    <td>{{ service.titulo || "Servico" }}</td>
-                    <td>{{ service.descricao }}</td>
-                    <td>R$ {{ service.preco }}</td>
-                    <td>{{ service.tempo_de_aula }} min</td>
-                    <td>{{ service.tipo_agendamento }}</td>
-                    <td>{{ service.categoria_id || "-" }}</td>
-                    <td>
-                      <img
-                        v-if="service.imagem"
-                        class="service-thumb"
-                        :src="serviceImageUrl(service.imagem)"
-                        alt="Imagem do servico"
-                      />
-                      <span v-else>-</span>
-                    </td>
-                    <td>
-                      <div class="actions">
-                        <button class="text-btn" @click="editService(service)">Editar</button>
-                        <button class="text-btn danger" @click="removeService(service.id)">Excluir</button>
-                      </div>
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-            <p v-if="!services.length && !servicesLoading" class="hint">Nenhum servico encontrado.</p>
-          </section>
-
-          <div v-if="serviceModalOpen" class="modal-overlay" @click.self="closeServiceModal">
-            <div class="modal-card">
-              <div class="view-header">
-                <h4>{{ serviceForm.id ? "Editar Servico" : "Novo Servico" }}</h4>
-                <button class="text-btn" @click="closeServiceModal">Fechar</button>
-              </div>
-              <p v-if="categoriesLoading" class="hint">Carregando categorias...</p>
-              <p v-if="categoriesError" class="error">{{ categoriesError }}</p>
-              <div class="form-grid">
-                <label class="field">
-                  <span>Titulo</span>
-                  <input type="text" v-model.trim="serviceForm.titulo" />
-                </label>
-                <label class="field">
-                  <span>Descricao</span>
-                  <input type="text" v-model.trim="serviceForm.descricao" />
-                </label>
-                <label class="field">
-                  <span>Preco (R$)</span>
-                  <input type="number" v-model.number="serviceForm.preco" />
-                </label>
-                <label class="field">
-                  <span>Tempo de Aula (min)</span>
-                  <input type="number" v-model.number="serviceForm.tempo_de_aula" />
-                </label>
-                <label class="field">
-                  <span>Tipo de Agendamento</span>
-                  <select v-model="serviceForm.tipo_agendamento">
-                    <option value="HORARIO">HORARIO</option>
-                    <option value="DIA">DIA</option>
-                  </select>
-                </label>
-                <label v-if="serviceForm.tipo_agendamento === 'DIA'" class="field">
-                  <span>Vagas por dia</span>
-                  <input type="number" v-model.number="serviceForm.vagas" min="1" />
-                </label>
-                <label class="field">
-                  <span>Categoria ID</span>
-                  <select v-model.number="serviceForm.categoria_id">
-                    <option :value="''">Selecione</option>
-                    <option v-for="cat in categories" :key="cat.id" :value="cat.id">
-                      {{ cat.nome || cat.id }}
-                    </option>
-                  </select>
-                </label>
-                <label class="field">
-                  <span>Imagem (URL)</span>
-                  <input type="file" accept="image/*" @change="onServiceImageChange" />
-                  <small class="hint">PNG/JPG ate 2MB.</small>
-                </label>
-              </div>
-              <div class="actions">
-                <button class="primary-btn" @click="saveService">Salvar</button>
-                <button class="text-btn" @click="resetServiceForm">Limpar</button>
-              </div>
-            </div>
-          </div>
-
-          <section v-if="currentTab === 'students'" class="view">
-            <div class="view-header">
-              <h3>Alunos</h3>
-              <button class="primary-btn" @click="startNewStudent">Novo</button>
-            </div>
-            <p v-if="studentsLoading" class="hint">Carregando alunos...</p>
-            <p v-if="studentsError" class="error">{{ studentsError }}</p>
-            <div class="table-wrap" v-if="studentsDetailed.length">
-              <table class="data-table">
-                <thead>
-                  <tr>
-                    <th>Nome</th>
-                    <th>Email</th>
-                    <th>Telefone</th>
-                    <th>Data Nascimento</th>
-                    <th>Acoes</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr v-for="student in studentsDetailed" :key="student.id">
-                    <td>{{ student.nome }}</td>
-                    <td>{{ student.email }}</td>
-                    <td>{{ student.telefone }}</td>
-                    <td>{{ student.data_nascimento }}</td>
-                    <td>
-                      <div class="actions">
-                        <button class="text-btn" @click="editStudent(student)">Editar</button>
-                        <button class="text-btn danger" @click="removeStudent(student.id)">Excluir</button>
-                      </div>
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-            <p v-if="!studentsDetailed.length" class="hint">Nenhum aluno encontrado.</p>
-          </section>
-
-          <div v-if="studentModalOpen" class="modal-overlay" @click.self="closeStudentModal">
-            <div class="modal-card">
-              <div class="view-header">
-                <h4>{{ studentForm.id ? "Editar Aluno" : "Novo Aluno" }}</h4>
-                <button class="text-btn" @click="closeStudentModal">Fechar</button>
-              </div>
-              <div class="form-grid">
-                <label class="field">
-                  <span>Primeiro Nome</span>
-                  <input type="text" v-model.trim="studentForm.primeiro_nome" />
-                </label>
-                <label class="field">
-                  <span>Ultimo Nome</span>
-                  <input type="text" v-model.trim="studentForm.ultimo_nome" />
-                </label>
-                <label class="field">
-                  <span>Email</span>
-                  <input type="email" v-model.trim="studentForm.email" />
-                </label>
-                <label class="field">
-                  <span>Telefone</span>
-                  <input type="text" v-model.trim="studentForm.telefone" />
-                </label>
-                <label class="field">
-                  <span>Data de Nascimento</span>
-                  <input type="date" v-model="studentForm.data_nascimento" />
-                </label>
-                <label v-if="!studentForm.id" class="field">
-                  <span>Senha</span>
-                  <input type="password" v-model.trim="studentForm.password" />
-                </label>
-              </div>
-              <div class="actions">
-                <button class="primary-btn" @click="saveStudent">Salvar</button>
-                <button class="text-btn" @click="resetStudentForm">Limpar</button>
-              </div>
-            </div>
-          </div>
-
-          <section v-if="currentTab === 'availability'" class="view">
-            <div class="view-header">
-              <h3>Horarios</h3>
-              <button class="primary-btn" @click="startNewAvailability">Novo</button>
-            </div>
-            <div class="list">
-              <div v-for="slot in availability" :key="slot.id" class="list-item">
-                <div>
-                  <strong>{{ slot.day }} · {{ slot.start }} - {{ slot.end }}</strong>
-                  <p>{{ slot.status === "livre" ? "Disponivel" : "Bloqueado" }}</p>
-                </div>
-                <div class="actions">
-                  <button class="text-btn" @click="toggleAvailability(slot.id)">
-                    {{ slot.status === "livre" ? "Bloquear" : "Liberar" }}
-                  </button>
-                  <button class="text-btn danger" @click="removeAvailability(slot.id)">Remover</button>
-                </div>
-              </div>
-            </div>
-
-            <div class="form-card">
-              <h4>Novo Horario</h4>
-              <div class="form-grid">
-                <label class="field">
-                  <span>Dia</span>
-                  <select v-model="availabilityForm.day">
-                    <option disabled value="">Selecione</option>
-                    <option v-for="day in weekDays" :key="day">{{ day }}</option>
-                  </select>
-                </label>
-                <label class="field">
-                  <span>Inicio</span>
-                  <input type="time" v-model="availabilityForm.start" />
-                </label>
-                <label class="field">
-                  <span>Fim</span>
-                  <input type="time" v-model="availabilityForm.end" />
-                </label>
-              </div>
-              <div class="actions">
-                <button class="primary-btn" @click="saveAvailability">Salvar</button>
-                <button class="text-btn" @click="resetAvailabilityForm">Limpar</button>
-              </div>
-            </div>
-          </section>
-        </main>
-      </div>
-    </div>
+    <ClientPortal
+      v-else-if="clientAuthenticated && activePortal === 'cliente'"
+      :show-client-sidebar="showClientSidebar"
+      :client-tab="clientTab"
+      :client-profile="clientProfile"
+      :client-companies="clientCompanies"
+      :client-companies-loading="clientCompaniesLoading"
+      :client-companies-error="clientCompaniesError"
+      :client-services="clientServices"
+      :client-services-loading="clientServicesLoading"
+      :client-services-error="clientServicesError"
+      :selected-company="selectedCompany"
+      :client-services-for-company="clientServicesForCompany"
+      :selected-service="selectedService"
+      :selected-company-label="selectedCompanyLabel"
+      :selected-service-label="selectedServiceLabel"
+      :client-schedule-date="clientScheduleDate"
+      :client-availability-loading="clientAvailabilityLoading"
+      :client-availability-error="clientAvailabilityError"
+      :client-available-slots="clientAvailableSlots"
+      :client-bookings-detailed="clientBookingsDetailed"
+      :client-profile-saved="clientProfileSaved"
+      :show-slots-modal="clientSlotsModalOpen"
+      :toggle-client-sidebar="toggleClientSidebar"
+      :close-client-sidebar="closeClientSidebar"
+      :go-to-client-tab="goToClientTab"
+      :client-logout="clientLogout"
+      :select-company="selectCompany"
+      :select-service="selectService"
+      :book-slot="bookSlot"
+      :remove-client-booking="removeClientBooking"
+      :close-slots-modal="closeClientSlotsModal"
+      :save-client-profile="saveClientProfile"
+      :company-city-label="companyCityLabel"
+      :company-descricao-label="companyDescricaoLabel"
+      :company-image-url="companyImageUrl"
+      :set-client-schedule-date="setClientScheduleDate"
+      :open-checkout="openClientCheckout"
+      :close-checkout="closeClientCheckout"
+      :confirm-checkout="confirmClientCheckout"
+      :checkout-open="clientCheckoutOpen"
+      :checkout-loading="clientCheckoutLoading"
+      :checkout-error="clientCheckoutError"
+      :checkout-summary="clientCheckoutSummary"
+      :checkout-methods="clientCheckoutMethods"
+      :checkout-method="clientCheckoutMethod"
+      :checkout-status="clientCheckoutStatus"
+      :checkout-card="clientCheckoutCard"
+      :checkout-pix-message="clientCheckoutPixMessage"
+      :checkout-pix-data="clientCheckoutPixData"
+      :checkout-pix-finalize-ready="clientCheckoutPixFinalizeReady"
+      :checkout-pix-expiration="clientCheckoutPixExpiration"
+      :set-checkout-method="setClientCheckoutMethod"
+      :set-checkout-status="setClientCheckoutStatus"
+      :set-checkout-card="setClientCheckoutCard"
+      :finalize-checkout="finalizeClientCheckout"
+    />
   </div>
 </template>
 
 <script>
+import LoginScreen from "./components/LoginScreen.vue";
+import ProfessorPortal from "./components/ProfessorPortal.vue";
+import ClientPortal from "./components/ClientPortal.vue";
+
 const API_BASE = "https://agendamento.rjpasseios.com.br/api";
 
 const STORAGE = {
@@ -473,7 +162,9 @@ const STORAGE = {
   APPOINTMENTS: "agenda_appointments",
   SERVICES: "agenda_services",
   STUDENTS: "agenda_students",
-  AVAILABILITY: "agenda_availability"
+  CLIENT_TOKEN: "agenda_client_token",
+  CLIENT_PROFILE: "agenda_client_profile",
+  CLIENT_BOOKINGS: "agenda_client_bookings"
 };
 
 const seedTeacher = { name: "Prof. Ana Silva", email: "prof@escola.com" };
@@ -482,6 +173,112 @@ const seedStudents = [
   { id: 1, name: "Lucas Mendes", email: "lucas@email.com", phone: "(11) 99999-1111", history: "3 aulas" },
   { id: 2, name: "Mariana Costa", email: "mariana@email.com", phone: "(11) 99999-2222", history: "5 aulas" },
   { id: 3, name: "Pedro Santos", email: "pedro@email.com", phone: "(11) 99999-3333", history: "1 aula" }
+];
+const seedClientProfile = {
+  nome: "Cliente Demo",
+  email: "cliente@email.com",
+  telefone: "(11) 98888-0000",
+  documento: "000.000.000-00",
+  foto: ""
+};
+const seedCompanies = [
+  {
+    id: 1,
+    nome: "RJP Passeios",
+    categoria: "Turismo",
+    cidade: "Rio de Janeiro",
+    descricao: "Passeios guiados com foco em experiencias locais."
+  },
+  {
+    id: 2,
+    nome: "Academia Movimento",
+    categoria: "Esportes",
+    cidade: "Sao Paulo",
+    descricao: "Treinos personalizados e aulas em grupo."
+  },
+  {
+    id: 3,
+    nome: "Studio Balance",
+    categoria: "Bem-estar",
+    cidade: "Curitiba",
+    descricao: "Yoga, pilates e terapias integrativas."
+  }
+];
+const seedClientServices = [
+  {
+    id: 11,
+    companyId: 1,
+    nome: "Passeio de Barco",
+    duracao: 90,
+    preco: 180,
+    descricao: "Tour pela orla com paradas para fotos."
+  },
+  {
+    id: 12,
+    companyId: 1,
+    nome: "City Tour",
+    duracao: 120,
+    preco: 220,
+    descricao: "Roteiro pelos pontos principais da cidade."
+  },
+  {
+    id: 21,
+    companyId: 2,
+    nome: "Treino Funcional",
+    duracao: 60,
+    preco: 80,
+    descricao: "Aulas em grupo com foco em condicionamento."
+  },
+  {
+    id: 22,
+    companyId: 2,
+    nome: "Personal Training",
+    duracao: 60,
+    preco: 150,
+    descricao: "Atendimento individual com plano personalizado."
+  },
+  {
+    id: 31,
+    companyId: 3,
+    nome: "Pilates",
+    duracao: 50,
+    preco: 120,
+    descricao: "Sessao de pilates em aparelhos."
+  },
+  {
+    id: 32,
+    companyId: 3,
+    nome: "Yoga Flow",
+    duracao: 70,
+    preco: 110,
+    descricao: "Aula de yoga dinamica com respiracao guiada."
+  }
+];
+const seedClientSlots = {
+  11: ["09:00", "10:20", "13:00", "15:40"],
+  12: ["08:30", "11:00", "14:30"],
+  21: ["07:00", "08:00", "18:00", "19:00"],
+  22: ["09:30", "12:00", "16:00"],
+  31: ["06:30", "10:00", "17:00"],
+  32: ["08:15", "12:15", "18:30"]
+};
+const seedClientBookings = [
+  {
+    id: 1001,
+    companyId: 1,
+    serviceId: 11,
+    date: addDays(todayISO(), 1),
+    time: "10:20",
+    status: "confirmado"
+  },
+  {
+    id: 1002,
+    companyId: 2,
+    serviceId: 21,
+    date: addDays(todayISO(), 3),
+    time: "18:00",
+    status: "pendente"
+  }
 ];
 
 function todayISO() {
@@ -528,11 +325,7 @@ const seedAppointments = [
     status: "cancelado"
   }
 ];
-const seedAvailability = [
-  { id: 1, day: "Segunda", start: "08:00", end: "12:00", status: "livre" },
-  { id: 2, day: "Quarta", start: "14:00", end: "18:00", status: "livre" },
-  { id: 3, day: "Sexta", start: "09:00", end: "13:00", status: "bloqueado" }
-];
+const WEEKDAY_LABELS = ["Domingo", "Segunda", "Terca", "Quarta", "Quinta", "Sexta", "Sabado"];
 
 function loadStorage(key, fallback) {
   const raw = localStorage.getItem(key);
@@ -554,7 +347,18 @@ function formatDateLabel(date) {
   return `${day}/${month}/${year}`;
 }
 
+function getDayNumber(dateStr) {
+  if (!dateStr) return 0;
+  const dt = new Date(`${dateStr}T00:00:00`);
+  return Number.isNaN(dt.getTime()) ? 0 : dt.getDay();
+}
+
 export default {
+  components: {
+    LoginScreen,
+    ProfessorPortal,
+    ClientPortal
+  },
   data() {
     return {
       loginForm: {
@@ -564,13 +368,77 @@ export default {
       loginError: "",
       showForgot: false,
       isAuthenticated: Boolean(localStorage.getItem(STORAGE.TOKEN)),
+      clientAuthenticated: Boolean(localStorage.getItem(STORAGE.CLIENT_TOKEN)),
+      activePortal: "professor",
       authLoading: false,
+      clientLoading: false,
       currentTab: "dashboard",
       teacher: loadStorage(STORAGE.TEACHER, seedTeacher),
       services: loadStorage(STORAGE.SERVICES, seedServices),
       students: loadStorage(STORAGE.STUDENTS, seedStudents),
       appointments: loadStorage(STORAGE.APPOINTMENTS, seedAppointments),
-      availability: loadStorage(STORAGE.AVAILABILITY, seedAvailability),
+      clientTab: "companies",
+      clientLoginForm: {
+        email: "",
+        password: ""
+      },
+      clientLoginError: "",
+      clientProfile: loadStorage(STORAGE.CLIENT_PROFILE, seedClientProfile),
+      clientProfileSaved: false,
+      clientCompanies: [],
+      clientCompaniesLoading: false,
+      clientCompaniesError: "",
+      clientServices: [],
+      clientServicesLoading: false,
+      clientServicesError: "",
+      clientAvailableSlots: [],
+      clientAvailabilityLoading: false,
+      clientAvailabilityError: "",
+      clientBookings: loadStorage(STORAGE.CLIENT_BOOKINGS, seedClientBookings),
+      selectedCompanyId: "",
+      selectedServiceId: "",
+      clientScheduleDate: todayISO(),
+      clientSlotsModalOpen: false,
+      clientCheckoutOpen: false,
+      clientCheckoutLoading: false,
+      clientCheckoutError: "",
+      clientCheckoutMethods: [],
+      clientCheckoutMethod: "",
+      clientCheckoutStatus: "PENDING",
+      clientCheckoutProfessorId: "",
+      clientCheckoutAlunoId: "",
+      clientCheckoutModalidadeId: "",
+      clientCheckoutTokenGateway: "",
+      clientCheckoutSummary: {
+        date: "",
+        time: "",
+        title: "",
+        price: ""
+      },
+      clientCheckoutCard: {
+        name: "",
+        number: "",
+        expiry: "",
+        cvv: "",
+        cpf: ""
+      },
+      clientCheckoutPixData: null,
+      clientCheckoutPixMessage: "",
+      clientCheckoutPixFinalizeReady: false,
+      clientCheckoutPixExpiration: "",
+      clientCheckoutPixIntervalId: null,
+      showClientSidebar: false,
+      availabilitySlots: [],
+      contractedSlots: [],
+      availabilityQuery: {
+        date: todayISO(),
+        serviceId: ""
+      },
+      availabilityMode: "available",
+      availabilityLoading: false,
+      availabilityError: "",
+      contractedLoading: false,
+      contractedError: "",
       dashboardStart: "",
       dashboardEnd: "",
       activeDashboardStart: "",
@@ -611,12 +479,6 @@ export default {
         data_nascimento: "",
         password: ""
       },
-      availabilityForm: {
-        day: "",
-        start: "",
-        end: ""
-      },
-      weekDays: ["Segunda", "Terca", "Quarta", "Quinta", "Sexta", "Sabado"],
       showSidebar: false,
       serviceModalOpen: false,
       servicesLoading: false,
@@ -638,6 +500,47 @@ export default {
     },
     studentsDetailed() {
       return this.students.map((student) => this.normalizeStudent(student));
+    },
+    selectedCompany() {
+      return (
+        this.clientCompanies.find(
+          (company) => String(company.id) === String(this.selectedCompanyId)
+        ) || null
+      );
+    },
+    selectedService() {
+      return (
+        this.clientServices.find(
+          (service) => String(service.id) === String(this.selectedServiceId)
+        ) || null
+      );
+    },
+    selectedCompanyLabel() {
+      return this.selectedCompany ? this.selectedCompany.nome : "-";
+    },
+    selectedServiceLabel() {
+      return this.selectedService ? this.selectedService.titulo || this.selectedService.nome : "-";
+    },
+    clientServicesForCompany() {
+      if (!this.selectedCompanyId) return [];
+      return this.clientServices.filter((service) => {
+        const empresaId = service.empresa_id || service.companyId;
+        return String(empresaId) === String(this.selectedCompanyId);
+      });
+    },
+    clientBookingsDetailed() {
+      return this.clientBookings.map((booking) => {
+        const company =
+          this.clientCompanies.find((item) => item.id === booking.companyId) || {};
+        const service =
+          this.clientServices.find((item) => item.id === booking.serviceId) || {};
+        return {
+          ...booking,
+          companyName: company.nome || "Empresa",
+          serviceName: service.nome || "Servico",
+          dateLabel: formatDateLabel(booking.date)
+        };
+      });
     },
     filteredAppointments() {
       return this.appointmentsDetailed.filter((appt) => {
@@ -692,10 +595,31 @@ export default {
           label: formatDateLabel(date),
           count: map[date]
         }));
+    },
+    availabilityDayLabel() {
+      if (!this.availabilityQuery.date) return "-";
+      const day = getDayNumber(this.availabilityQuery.date);
+      return WEEKDAY_LABELS[day] || "-";
+    }
+  },
+  watch: {
+    clientScheduleDate() {
+      if (this.clientSlotsModalOpen) {
+        this.fetchClientAvailability();
+      }
     }
   },
   created() {
     this.seedStorage();
+    if (this.isAuthenticated) {
+      this.activePortal = "professor";
+    } else if (this.clientAuthenticated) {
+      this.activePortal = "cliente";
+    }
+    this.fetchClientCompanies();
+    if (!this.availabilityQuery.serviceId && this.services.length) {
+      this.availabilityQuery.serviceId = this.services[0].id;
+    }
     if (this.isAuthenticated) {
       this.fetchServices();
       this.fetchCategories();
@@ -709,14 +633,125 @@ export default {
       if (!localStorage.getItem(STORAGE.SERVICES)) saveStorage(STORAGE.SERVICES, seedServices);
       if (!localStorage.getItem(STORAGE.STUDENTS)) saveStorage(STORAGE.STUDENTS, seedStudents);
       if (!localStorage.getItem(STORAGE.APPOINTMENTS)) saveStorage(STORAGE.APPOINTMENTS, seedAppointments);
-      if (!localStorage.getItem(STORAGE.AVAILABILITY)) saveStorage(STORAGE.AVAILABILITY, seedAvailability);
+      if (!localStorage.getItem(STORAGE.CLIENT_PROFILE)) saveStorage(STORAGE.CLIENT_PROFILE, seedClientProfile);
+      if (!localStorage.getItem(STORAGE.CLIENT_BOOKINGS)) saveStorage(STORAGE.CLIENT_BOOKINGS, seedClientBookings);
     },
     toggleSidebar() {
       this.showSidebar = !this.showSidebar;
     },
+    closeSidebar() {
+      this.showSidebar = false;
+    },
     goToTab(tab) {
       this.currentTab = tab;
       this.showSidebar = false;
+      if (tab === "availability" && this.availabilityQuery.date && this.availabilityQuery.serviceId) {
+        this.fetchAvailability();
+      }
+    },
+    toggleClientSidebar() {
+      this.showClientSidebar = !this.showClientSidebar;
+    },
+    closeClientSidebar() {
+      this.showClientSidebar = false;
+    },
+    goToClientTab(tab) {
+      this.clientTab = tab;
+      this.showClientSidebar = false;
+      if (tab === "slots") {
+        this.fetchClientAvailability();
+      }
+    },
+    selectCompany(company) {
+      this.selectedCompanyId = company.id;
+      this.selectedServiceId = "";
+      this.fetchClientServices(company.id);
+      this.clientTab = "services";
+    },
+    selectService(service) {
+      this.selectedServiceId = service.id;
+      this.fetchClientAvailability();
+      this.clientSlotsModalOpen = true;
+    },
+    closeClientSlotsModal() {
+      this.clientSlotsModalOpen = false;
+    },
+    setClientScheduleDate(value) {
+      this.clientScheduleDate = value;
+    },
+    openClientCheckout(slot) {
+      this.clientCheckoutError = "";
+      this.clientCheckoutSummary = {
+        date: this.clientScheduleDate,
+        time: slot,
+        title: this.selectedService?.titulo || this.selectedService?.nome || "Servico",
+        price: this.selectedService?.preco || this.selectedService?.valor || "-"
+      };
+      this.clientCheckoutOpen = true;
+      this.clientSlotsModalOpen = false;
+      this.resetClientCheckoutPix();
+      this.fetchClientCheckoutAuth();
+    },
+    closeClientCheckout() {
+      this.clientCheckoutOpen = false;
+      this.clearClientCheckoutPixInterval();
+    },
+    confirmClientCheckout() {
+      if (!this.validateClientCheckout()) return;
+      if (this.clientCheckoutMethod === "pix") {
+        this.generateClientPixPayment();
+        return;
+      }
+      if (this.clientCheckoutMethod === "cartao") {
+        this.processClientCardPayment();
+        return;
+      }
+      this.finalizeClientCheckout();
+    },
+    setClientCheckoutMethod(value) {
+      this.clientCheckoutMethod = value;
+      if (value !== "pix") {
+        this.resetClientCheckoutPix();
+        this.clearClientCheckoutPixInterval();
+      }
+    },
+    setClientCheckoutStatus(value) {
+      this.clientCheckoutStatus = value;
+    },
+    setClientCheckoutCard(field, value) {
+      this.clientCheckoutCard = {
+        ...this.clientCheckoutCard,
+        [field]: value
+      };
+    },
+    bookSlot(slot) {
+      if (!this.selectedCompanyId || !this.selectedServiceId || !this.clientScheduleDate) return;
+      const exists = this.clientBookings.some(
+        (booking) =>
+          booking.serviceId === this.selectedServiceId &&
+          booking.date === this.clientScheduleDate &&
+          booking.time === slot
+      );
+      if (exists) return;
+      const newBooking = {
+        id: Date.now(),
+        companyId: this.selectedCompanyId,
+        serviceId: this.selectedServiceId,
+        date: this.clientScheduleDate,
+        time: slot,
+        status: "pendente"
+      };
+      this.clientBookings = [...this.clientBookings, newBooking];
+      saveStorage(STORAGE.CLIENT_BOOKINGS, this.clientBookings);
+    },
+    removeClientBooking(id) {
+      this.clientBookings = this.clientBookings.filter((booking) => booking.id !== id);
+      saveStorage(STORAGE.CLIENT_BOOKINGS, this.clientBookings);
+    },
+    saveClientProfile() {
+      this.clientProfileSaved = false;
+      saveStorage(STORAGE.CLIENT_PROFILE, this.clientProfile);
+      this.clientProfileSaved = true;
     },
     handleLogin() {
       this.loginError = "";
@@ -725,7 +760,7 @@ export default {
         return;
       }
       this.authLoading = true;
-      fetch(API_BASE+"/api/login", {
+      fetch("/api/login", {
         method: "POST",
         headers: {
           "Content-Type": "application/json"
@@ -752,6 +787,7 @@ export default {
             localStorage.setItem(STORAGE.PROFESSOR, data.professor_id);
           }
           this.isAuthenticated = true;
+          this.activePortal = "professor";
           this.currentTab = "dashboard";
           this.teacher = { ...this.teacher, email: this.loginForm.email };
           this.fetchServices();
@@ -768,15 +804,423 @@ export default {
           this.authLoading = false;
         });
     },
+    handleClientLogin() {
+      this.clientLoginError = "";
+      if (!this.clientLoginForm.email || !this.clientLoginForm.password) {
+        this.clientLoginError = "Informe email e senha.";
+        return;
+      }
+      this.clientLoading = true;
+      localStorage.setItem(STORAGE.CLIENT_TOKEN, "cliente-demo");
+      this.clientAuthenticated = true;
+      this.activePortal = "cliente";
+      this.clientLoginForm.email = "";
+      this.clientLoginForm.password = "";
+      this.clientLoading = false;
+      this.fetchClientCompanies();
+    },
     logout() {
       this.isAuthenticated = false;
       localStorage.removeItem(STORAGE.TOKEN);
       localStorage.removeItem(STORAGE.EMPRESA);
       localStorage.removeItem(STORAGE.PROFESSOR);
+      this.activePortal = this.clientAuthenticated ? "cliente" : "professor";
+    },
+    clientLogout() {
+      this.clientAuthenticated = false;
+      localStorage.removeItem(STORAGE.CLIENT_TOKEN);
+      this.activePortal = this.isAuthenticated ? "professor" : "cliente";
     },
     authHeaders() {
       const token = localStorage.getItem(STORAGE.TOKEN);
       return token ? { Authorization: `Bearer ${token}` } : {};
+    },
+    companyCityLabel(company) {
+      const city =
+        company.cidade ||
+        company.endereco?.cidade ||
+        company.endereco?.municipio ||
+        "-";
+      const categoria =
+        company.categoria ||
+        company.modalidade?.nome ||
+        company.modalidade?.titulo ||
+        "-";
+      return `${city} - ${categoria}`;
+    },
+    companyImageUrl(company) {
+      const avatar = company.avatar || "";
+      const banner = company.banners || "";
+      const value = avatar || banner;
+      if (!value) return "";
+      if (value.startsWith("http")) return value;
+      const normalized = value.replace(/^\/+/, "");
+      if (normalized.includes("/")) {
+        return `https://agendamento.rjpasseios.com.br/${normalized}`;
+      }
+      const folder = avatar ? "avatar" : "banner";
+      return `https://agendamento.rjpasseios.com.br/${folder}/${normalized}`;
+    },
+    companyDescricaoLabel(company) {
+      return (
+        company.endereco?.bairro ||
+        company.bairro ||
+        company.endereco?.logradouro ||
+        ""
+      );
+    },
+    resolveClientProfessorId() {
+      if (this.selectedService?.professor_id) return this.selectedService.professor_id;
+      if (this.selectedService?.professor?.id) return this.selectedService.professor.id;
+      if (this.selectedService?.user_id) return this.selectedService.user_id;
+      if (this.selectedCompany?.professor_id) return this.selectedCompany.professor_id;
+      if (this.selectedCompany?.professor?.id) return this.selectedCompany.professor.id;
+      if (this.selectedCompany?.user_id) return this.selectedCompany.user_id;
+      return "";
+    },
+    fetchClientCompanies() {
+      this.clientCompaniesLoading = true;
+      this.clientCompaniesError = "";
+      fetch("/api/search/empresa", {
+        headers: {
+          "Content-Type": "application/json"
+        }
+      })
+        .then(async (response) => {
+          const data = await response.json().catch(() => []);
+          if (!response.ok) {
+            throw new Error(data.error || "Erro ao carregar empresas.");
+          }
+          this.clientCompanies = Array.isArray(data) ? data : [];
+          if (!this.selectedCompanyId && this.clientCompanies.length) {
+            this.selectedCompanyId = this.clientCompanies[0].id;
+            this.fetchClientServices(this.selectedCompanyId);
+          }
+        })
+        .catch((error) => {
+          this.clientCompaniesError = error.message || "Erro ao carregar empresas.";
+        })
+        .finally(() => {
+          this.clientCompaniesLoading = false;
+        });
+    },
+    fetchClientServices(empresaId) {
+      if (!empresaId) return;
+      this.clientServicesLoading = true;
+      this.clientServicesError = "";
+      fetch(`/api/servicos/empresa/${empresaId}`, {
+        headers: {
+          "Content-Type": "application/json"
+        }
+      })
+        .then(async (response) => {
+          const data = await response.json().catch(() => []);
+          if (!response.ok) {
+            throw new Error(data.error || "Erro ao carregar servicos.");
+          }
+          this.clientServices = Array.isArray(data) ? data : [];
+          if (!this.selectedServiceId && this.clientServices.length) {
+            this.selectedServiceId = this.clientServices[0].id;
+          }
+        })
+        .catch((error) => {
+          this.clientServicesError = error.message || "Erro ao carregar servicos.";
+        })
+        .finally(() => {
+          this.clientServicesLoading = false;
+        });
+    },
+    fetchClientAvailability() {
+      this.clientAvailabilityError = "";
+      this.clientAvailableSlots = [];
+      const date = this.clientScheduleDate;
+      const serviceId = this.selectedServiceId;
+      const professorId = this.resolveClientProfessorId();
+      if (!date || !serviceId) {
+        this.clientAvailabilityError = "Selecione data e servico.";
+        return;
+      }
+      if (!professorId) {
+        this.clientAvailabilityError = "Profissional nao encontrado para esta empresa.";
+        return;
+      }
+      this.clientAvailabilityLoading = true;
+      const params = new URLSearchParams({
+        day: String(getDayNumber(date)),
+        data_select: date,
+        professor_id: String(professorId),
+        servico_id: String(serviceId)
+      });
+      fetch(`${API_BASE}/disponibilidade?${params.toString()}`, {
+        headers: {
+          "Content-Type": "application/json"
+        }
+      })
+        .then(async (response) => {
+          const data = await response.json().catch(() => []);
+          if (!response.ok) {
+            throw new Error(data.error || "Erro ao carregar horarios.");
+          }
+          this.clientAvailableSlots = Array.isArray(data) ? data : [];
+        })
+        .catch((error) => {
+          this.clientAvailabilityError = error.message || "Erro ao carregar horarios.";
+        })
+        .finally(() => {
+          this.clientAvailabilityLoading = false;
+        });
+    },
+    fetchClientCheckoutAuth() {
+      const userId = this.selectedCompany?.user_id || this.resolveClientProfessorId();
+      if (!userId) {
+        this.clientCheckoutError = "Empresa nao encontrada para pagamento.";
+        return;
+      }
+      this.clientCheckoutLoading = true;
+      this.clientCheckoutError = "";
+      fetch(`/api/checkout-auth/${userId}`, {
+        headers: {
+          "Content-Type": "application/json"
+        }
+      })
+        .then(async (response) => {
+          const data = await response.json().catch(() => ({}));
+          if (!response.ok) {
+            throw new Error(data.message || "Erro ao carregar pagamento.");
+          }
+          const methods = Array.isArray(data.formasPagamento) ? data.formasPagamento : [];
+          this.clientCheckoutMethods = methods;
+          if (!methods.includes(this.clientCheckoutMethod)) {
+            this.clientCheckoutMethod = methods[0] || "";
+          }
+          this.clientCheckoutProfessorId = data.professor?.id || "";
+          this.clientCheckoutModalidadeId = data.professor?.modalidade_id || "";
+          this.clientCheckoutTokenGateway = data.token_gateway || "";
+          this.clientCheckoutAlunoId = data.user_id || "";
+        })
+        .catch((error) => {
+          this.clientCheckoutError = error.message || "Erro ao carregar pagamento.";
+        })
+        .finally(() => {
+          this.clientCheckoutLoading = false;
+        });
+    },
+    validateClientCheckout() {
+      if (!this.clientCheckoutSummary.date || !this.clientCheckoutSummary.time) {
+        this.clientCheckoutError = "Dados do agendamento incompletos.";
+        return false;
+      }
+      if (!this.clientCheckoutMethod) {
+        this.clientCheckoutError = "Selecione uma forma de pagamento.";
+        return false;
+      }
+      if (this.clientCheckoutMethod === "cartao") {
+        const { name, number, expiry, cvv, cpf } = this.clientCheckoutCard;
+        if (!name || !number || !expiry || !cvv || !cpf) {
+          this.clientCheckoutError = "Preencha todos os dados do cartao.";
+          return false;
+        }
+      }
+      return true;
+    },
+    generateClientPixPayment() {
+      if (!this.clientCheckoutAlunoId) {
+        this.clientCheckoutError = "Aluno nao encontrado para pagamento.";
+        return;
+      }
+      this.clientCheckoutLoading = true;
+      this.clientCheckoutError = "";
+      const payload = {
+        usuario_id: Number(this.clientCheckoutAlunoId),
+        value: Number(this.clientCheckoutSummary.price || 0),
+        description: `Pagamento de aula particular - ${this.clientCheckoutSummary.title}`,
+        due_date: this.clientCheckoutSummary.date
+      };
+      fetch("/api/pix-qrcode", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(payload)
+      })
+        .then(async (response) => {
+          const data = await response.json().catch(() => ({}));
+          if (!response.ok || !data.success) {
+            throw new Error(data.message || "Erro ao gerar PIX.");
+          }
+          this.clientCheckoutPixData = data;
+          this.clientCheckoutPixMessage = "Aguardando pagamento via PIX.";
+          this.clientCheckoutPixExpiration = data.qr_code?.expiration_date || "";
+          this.clientCheckoutPixFinalizeReady = false;
+          this.clearClientCheckoutPixInterval();
+          this.clientCheckoutPixIntervalId = setInterval(() => {
+            this.checkClientPixPaymentStatus();
+          }, 20000);
+        })
+        .catch((error) => {
+          this.clientCheckoutError = error.message || "Erro ao gerar PIX.";
+        })
+        .finally(() => {
+          this.clientCheckoutLoading = false;
+        });
+    },
+    checkClientPixPaymentStatus() {
+      const paymentId = this.clientCheckoutPixData?.payment?.id;
+      if (!paymentId) {
+        this.clearClientCheckoutPixInterval();
+        return;
+      }
+      fetch("/api/pix-status", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ payment_id: paymentId })
+      })
+        .then(async (response) => {
+          const data = await response.json().catch(() => ({}));
+          if (!response.ok || !data.success) {
+            throw new Error(data.message || "Erro ao verificar PIX.");
+          }
+          if (data.status === "RECEIVED") {
+            this.clientCheckoutPixMessage = "Pagamento confirmado!";
+            this.clientCheckoutPixFinalizeReady = true;
+            this.clearClientCheckoutPixInterval();
+          } else {
+            this.clientCheckoutPixMessage = "Aguardando pagamento via PIX.";
+            this.clientCheckoutPixFinalizeReady = false;
+          }
+        })
+        .catch((error) => {
+          this.clientCheckoutPixMessage = error.message || "Erro ao verificar PIX.";
+        });
+    },
+    processClientCardPayment() {
+      if (!this.clientCheckoutAlunoId) {
+        this.clientCheckoutError = "Aluno nao encontrado para pagamento.";
+        return;
+      }
+      const [month, year] = String(this.clientCheckoutCard.expiry || "").split("/");
+      const endereco = this.selectedCompany?.endereco?.endereco || this.selectedCompany?.endereco?.logradouro || "";
+      const cidade = this.selectedCompany?.endereco?.cidade || "";
+      const cep = this.selectedCompany?.endereco?.cep || "";
+      const payload = {
+        card_number: this.clientCheckoutCard.number.replace(/\s/g, ""),
+        card_holder: this.clientCheckoutCard.name.trim(),
+        card_expiry_month: month || "",
+        card_expiry_year: year ? `20${year}` : "",
+        card_ccv: this.clientCheckoutCard.cvv,
+        value: Number(this.clientCheckoutSummary.price || 0),
+        name: this.clientCheckoutCard.name.trim(),
+        email: this.clientProfile.email || "cliente@email.com",
+        phone: this.clientProfile.telefone || "",
+        address: endereco || "Endereco nao informado",
+        province: cidade || "Cidade",
+        postalCode: String(cep).replace(/\D/g, ""),
+        cpfCnpj: this.clientCheckoutCard.cpf.replace(/\D/g, ""),
+        addressNumber: "0",
+        aluno_id: this.clientCheckoutAlunoId,
+        professor_id: this.clientCheckoutProfessorId,
+        modalidade_id: this.clientCheckoutModalidadeId || 1,
+        data_aula: this.clientCheckoutSummary.date,
+        hora_aula: this.clientCheckoutSummary.time,
+        titulo: this.clientCheckoutSummary.title,
+        payment_method: "cartao",
+        status: "RECEIVED",
+        usuario_id: this.clientCheckoutAlunoId
+      };
+      this.clientCheckoutLoading = true;
+      fetch("/api/pagarComCartao", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(payload)
+      })
+        .then(async (response) => {
+          const data = await response.json().catch(() => ({}));
+          if (!response.ok || data.success === false) {
+            throw new Error(data.error || data.message || "Erro no pagamento.");
+          }
+          if (data.redirect_url) {
+            window.location.href = `${data.redirect_url}?method=CARTAOC`;
+            return;
+          }
+          this.finalizeClientCheckout();
+        })
+        .catch((error) => {
+          this.clientCheckoutError = error.message || "Erro no pagamento.";
+        })
+        .finally(() => {
+          this.clientCheckoutLoading = false;
+        });
+    },
+    finalizeClientCheckout() {
+      if (!this.clientCheckoutSummary.time) return;
+      if (this.clientCheckoutMethod === "presencial") {
+        this.submitPresencialPayment();
+        return;
+      }
+      this.clientScheduleDate = this.clientCheckoutSummary.date || this.clientScheduleDate;
+      this.bookSlot(this.clientCheckoutSummary.time);
+      this.clientCheckoutOpen = false;
+      this.clientTab = "bookings";
+    },
+    resetClientCheckoutPix() {
+      this.clientCheckoutPixData = null;
+      this.clientCheckoutPixMessage = "";
+      this.clientCheckoutPixFinalizeReady = false;
+      this.clientCheckoutPixExpiration = "";
+    },
+    clearClientCheckoutPixInterval() {
+      if (this.clientCheckoutPixIntervalId) {
+        clearInterval(this.clientCheckoutPixIntervalId);
+        this.clientCheckoutPixIntervalId = null;
+      }
+    },
+    submitPresencialPayment() {
+      if (!this.clientCheckoutAlunoId || !this.clientCheckoutProfessorId) {
+        this.clientCheckoutError = "Dados do aluno/professor incompletos.";
+        return;
+      }
+      this.clientCheckoutLoading = true;
+      this.clientCheckoutError = "";
+      const payload = {
+        aluno_id: this.clientCheckoutAlunoId,
+        professor_id: this.clientCheckoutProfessorId,
+        modalidade_id: this.clientCheckoutModalidadeId || 1,
+        data_aula: this.clientCheckoutSummary.date,
+        hora_aula: this.clientCheckoutSummary.time,
+        valor_aula: this.clientCheckoutSummary.price,
+        titulo: this.clientCheckoutSummary.title,
+        servico_id: this.selectedServiceId,
+        payment_method: "presencial",
+        status: this.clientCheckoutStatus || "PENDING",
+        usuario_id: this.clientCheckoutAlunoId
+      };
+      fetch("/api/pagamento/presencial-api", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(payload)
+      })
+        .then(async (response) => {
+          const data = await response.json().catch(() => ({}));
+          if (!response.ok || data.success === false) {
+            throw new Error(data.message || "Erro ao criar pagamento presencial.");
+          }
+          this.clientScheduleDate = this.clientCheckoutSummary.date || this.clientScheduleDate;
+          this.bookSlot(this.clientCheckoutSummary.time);
+          this.clientCheckoutOpen = false;
+          this.clientTab = "bookings";
+        })
+        .catch((error) => {
+          this.clientCheckoutError = error.message || "Erro ao criar pagamento presencial.";
+        })
+        .finally(() => {
+          this.clientCheckoutLoading = false;
+        });
     },
     normalizeStudent(student) {
       const user = student.usuario || student;
@@ -872,6 +1316,12 @@ export default {
       this.activeDashboardEnd = this.dashboardEnd;
       this.activeDay = this.activeDashboardStart || todayISO();
     },
+    setDashboardStart(value) {
+      this.dashboardStart = value;
+    },
+    setDashboardEnd(value) {
+      this.dashboardEnd = value;
+    },
     openDaySchedule() {
       this.activeDay = this.activeDashboardStart || todayISO();
       this.currentTab = "daySchedule";
@@ -945,6 +1395,9 @@ export default {
             throw new Error(data.error || "Erro ao carregar servicos.");
           }
           this.services = Array.isArray(data) ? data : [];
+          if (!this.availabilityQuery.serviceId && this.services.length) {
+            this.availabilityQuery.serviceId = this.services[0].id;
+          }
           saveStorage(STORAGE.SERVICES, this.services);
         })
         .catch((error) => {
@@ -1128,6 +1581,7 @@ export default {
             telefone: this.studentForm.telefone
           }
         : {
+            professor_id: loadStorage(STORAGE.PROFESSOR, ""),
             nome: `${this.studentForm.primeiro_nome} ${this.studentForm.ultimo_nome}`.trim(),
             email: this.studentForm.email,
             password: this.studentForm.password,
@@ -1201,38 +1655,115 @@ export default {
         password: ""
       };
     },
-    startNewAvailability() {
-      this.resetAvailabilityForm();
+    setAvailabilityMode(value) {
+      this.availabilityMode = value;
     },
-    toggleAvailability(id) {
-      this.availability = this.availability.map((slot) =>
-        slot.id === id ? { ...slot, status: slot.status === "livre" ? "bloqueado" : "livre" } : slot
-      );
-      saveStorage(STORAGE.AVAILABILITY, this.availability);
-    },
-    removeAvailability(id) {
-      this.availability = this.availability.filter((slot) => slot.id !== id);
-      saveStorage(STORAGE.AVAILABILITY, this.availability);
-    },
-    saveAvailability() {
-      if (!this.availabilityForm.day || !this.availabilityForm.start || !this.availabilityForm.end) return;
-      const newSlot = {
-        id: Date.now(),
-        day: this.availabilityForm.day,
-        start: this.availabilityForm.start,
-        end: this.availabilityForm.end,
-        status: "livre"
-      };
-      this.availability = [...this.availability, newSlot];
-      saveStorage(STORAGE.AVAILABILITY, this.availability);
-      this.resetAvailabilityForm();
-    },
-    resetAvailabilityForm() {
-      this.availabilityForm = {
-        day: "",
-        start: "",
-        end: ""
-      };
+    fetchAvailability() {
+      this.availabilityError = "";
+      this.availabilitySlots = [];
+      this.contractedError = "";
+      this.contractedSlots = [];
+      const date = this.availabilityQuery.date;
+      const serviceId = this.availabilityQuery.serviceId;
+      const professorId = loadStorage(STORAGE.PROFESSOR, "");
+      if (!date || !serviceId) {
+        this.availabilityError = "Selecione data e servico.";
+        return;
+      }
+      if (!professorId) {
+        this.availabilityError = "Professor nao encontrado.";
+        return;
+      }
+      const shouldLoadAvailable = this.availabilityMode === "available" || this.availabilityMode === "all";
+      const shouldLoadBooked = this.availabilityMode === "booked" || this.availabilityMode === "all";
+      const baseParams = new URLSearchParams({
+        day: String(getDayNumber(date)),
+        data_select: date,
+        professor_id: String(professorId),
+        servico_id: String(serviceId)
+      });
+      const requests = [];
+      if (shouldLoadAvailable) {
+        this.availabilityLoading = true;
+        const availableReq = fetch(`${API_BASE}/disponibilidade?${baseParams.toString()}`, {
+          headers: {
+            "Content-Type": "application/json",
+            ...this.authHeaders()
+          }
+        })
+          .then(async (response) => {
+            const data = await response.json().catch(() => []);
+            if (!response.ok) {
+              throw new Error(data.error || "Erro ao carregar disponibilidade.");
+            }
+            this.availabilitySlots = Array.isArray(data) ? data : [];
+          })
+          .catch((error) => {
+            this.availabilityError = error.message || "Erro ao carregar disponibilidade.";
+          })
+          .finally(() => {
+            this.availabilityLoading = false;
+          });
+        requests.push(availableReq);
+      } else {
+        this.availabilitySlots = [];
+      }
+      if (shouldLoadBooked) {
+        this.contractedLoading = true;
+        const bookedParams = new URLSearchParams({
+          data_select: date,
+          professor_id: String(professorId),
+          servico_id: String(serviceId)
+        });
+        const bookedReq = fetch(
+          `${API_BASE}/disponibilidade/horarios-contratados?${bookedParams.toString()}`,
+          {
+            headers: {
+              "Content-Type": "application/json",
+              ...this.authHeaders()
+            }
+          }
+        )
+          .then(async (response) => {
+            const data = await response.json().catch(() => []);
+            if (!response.ok) {
+              throw new Error(data.error || "Erro ao carregar horarios contratados.");
+            }
+            this.contractedSlots = Array.isArray(data)
+              ? data.map((item, index) => {
+                  if (typeof item === "string") {
+                    return { key: `${item}-${index}`, time: item, label: "Contratado" };
+                  }
+                  const time = item.horario || item.time || item.hora || "-";
+                  const aluno =
+                    item.aluno_nome ||
+                    item.alunoNome ||
+                    item.aluno?.nome ||
+                    item.aluno?.usuario?.nome ||
+                    item.studentName ||
+                    "Aluno";
+                  const status = item.status || item.situacao || "contratado";
+                  return {
+                    key: `${time}-${index}`,
+                    time,
+                    label: `${aluno} - ${status}`
+                  };
+                })
+              : [];
+          })
+          .catch((error) => {
+            this.contractedError = error.message || "Erro ao carregar horarios contratados.";
+          })
+          .finally(() => {
+            this.contractedLoading = false;
+          });
+        requests.push(bookedReq);
+      } else {
+        this.contractedSlots = [];
+      }
+      if (!requests.length) {
+        this.availabilityError = "Selecione um modo de exibicao.";
+      }
     }
   }
 };
