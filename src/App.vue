@@ -152,7 +152,7 @@ import LoginScreen from "./components/LoginScreen.vue";
 import ProfessorPortal from "./components/ProfessorPortal.vue";
 import ClientPortal from "./components/ClientPortal.vue";
 
-const API_BASE = "https://agendamento.rjpasseios.com.br/api";
+const API_BASE = "https://agendamento.rjpasseios.com.br";
 
 const STORAGE = {
   TOKEN: "agenda_token",
@@ -760,7 +760,7 @@ export default {
         return;
       }
       this.authLoading = true;
-      fetch("/api/login", {
+      fetch(API_BASE+"/api/login", {
         method: "POST",
         headers: {
           "Content-Type": "application/json"
@@ -881,7 +881,7 @@ export default {
     fetchClientCompanies() {
       this.clientCompaniesLoading = true;
       this.clientCompaniesError = "";
-      fetch("/api/search/empresa", {
+      fetch(API_BASE+"/api/search/empresa", {
         headers: {
           "Content-Type": "application/json"
         }
@@ -908,7 +908,7 @@ export default {
       if (!empresaId) return;
       this.clientServicesLoading = true;
       this.clientServicesError = "";
-      fetch(`/api/servicos/empresa/${empresaId}`, {
+      fetch(API_BASE+`/api/servicos/empresa/${empresaId}`, {
         headers: {
           "Content-Type": "application/json"
         }
@@ -951,7 +951,7 @@ export default {
         professor_id: String(professorId),
         servico_id: String(serviceId)
       });
-      fetch(`${API_BASE}/disponibilidade?${params.toString()}`, {
+      fetch(`${API_BASE}/api/disponibilidade?${params.toString()}`, {
         headers: {
           "Content-Type": "application/json"
         }
@@ -978,7 +978,7 @@ export default {
       }
       this.clientCheckoutLoading = true;
       this.clientCheckoutError = "";
-      fetch(`/api/checkout-auth/${userId}`, {
+      fetch(`${API_BASE}/api/checkout-auth/${userId}`, {
         headers: {
           "Content-Type": "application/json"
         }
@@ -1036,7 +1036,7 @@ export default {
         description: `Pagamento de aula particular - ${this.clientCheckoutSummary.title}`,
         due_date: this.clientCheckoutSummary.date
       };
-      fetch("/api/pix-qrcode", {
+      fetch(API_BASE+"/api/pix-qrcode", {
         method: "POST",
         headers: {
           "Content-Type": "application/json"
@@ -1070,7 +1070,7 @@ export default {
         this.clearClientCheckoutPixInterval();
         return;
       }
-      fetch("/api/pix-status", {
+      fetch(API_BASE+"/api/pix-status", {
         method: "POST",
         headers: {
           "Content-Type": "application/json"
@@ -1130,7 +1130,7 @@ export default {
         usuario_id: this.clientCheckoutAlunoId
       };
       this.clientCheckoutLoading = true;
-      fetch("/api/pagarComCartao", {
+      fetch(API_BASE+"/api/pagarComCartao", {
         method: "POST",
         headers: {
           "Content-Type": "application/json"
@@ -1198,7 +1198,7 @@ export default {
         status: this.clientCheckoutStatus || "PENDING",
         usuario_id: this.clientCheckoutAlunoId
       };
-      fetch("/api/pagamento/presencial-api", {
+      fetch(API_BASE+"/api/pagamento/presencial-api", {
         method: "POST",
         headers: {
           "Content-Type": "application/json"
@@ -1264,7 +1264,7 @@ export default {
       if (!empresaId) return;
       this.appointmentsLoading = true;
       this.appointmentsError = "";
-      fetch(`/api/agendamento/empresa/${empresaId}`, {
+      fetch(`${API_BASE}/api/agendamento/empresa/${empresaId}`, {
         headers: {
           "Content-Type": "application/json",
           ...this.authHeaders()
@@ -1290,7 +1290,7 @@ export default {
       if (!empresaId) return;
       this.studentsLoading = true;
       this.studentsError = "";
-      fetch(`/api/alunos/empresa/${empresaId}`, {
+      fetch(`${API_BASE}/api/alunos/empresa/${empresaId}`, {
         headers: {
           "Content-Type": "application/json",
           ...this.authHeaders()
@@ -1382,7 +1382,7 @@ export default {
       this.servicesLoading = true;
       this.servicesError = "";
       const empresaId = loadStorage(STORAGE.EMPRESA, "");
-      const endpoint = empresaId ? `/api/servicos/empresa/${empresaId}` : "/api/servicos";
+      const endpoint = empresaId ? API_BASE+`/api/servicos/empresa/${empresaId}` : API_BASE+"/api/servicos";
       fetch(endpoint, {
         headers: {
           "Content-Type": "application/json",
@@ -1410,7 +1410,7 @@ export default {
     fetchCategories() {
       this.categoriesLoading = true;
       this.categoriesError = "";
-      fetch("/api/financeiro-categorias", {
+      fetch(API_BASE+"/api/financeiro-categorias", {
         headers: {
           "Content-Type": "application/json",
           ...this.authHeaders()
@@ -1501,7 +1501,7 @@ export default {
         });
     },
     removeService(id) {
-      fetch(`/api/servicos/${id}`, {
+      fetch(`${API_BASE}/api/servicos/${id}`, {
         method: "DELETE",
         headers: {
           "Content-Type": "application/json",
