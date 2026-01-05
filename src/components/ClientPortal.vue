@@ -39,7 +39,7 @@
           </div>
           <p v-if="clientCompaniesLoading" class="hint">Carregando empresas...</p>
           <p v-if="clientCompaniesError" class="error">{{ clientCompaniesError }}</p>
-          <div class="cards" v-if="clientCompanies.length">
+          <div class="cards company-cards" v-if="clientCompanies.length">
             <div
               v-for="company in clientCompanies"
               :key="company.id"
