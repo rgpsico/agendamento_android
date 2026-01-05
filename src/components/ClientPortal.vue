@@ -188,7 +188,7 @@
     </div>
 
     <div v-if="checkoutOpen" class="modal-overlay" @click.self="closeCheckout">
-      <div class="modal-card">
+      <div class="modal-card checkout-modal">
         <div class="view-header">
           <h4>Pagamento</h4>
           <button class="text-btn" @click="closeCheckout">Fechar</button>
@@ -210,139 +210,143 @@
             </div>
           </div>
 
-          <h4 class="card-title mb-4">Forma de Pagamento</h4>
-          <div v-if="!checkoutMethods.length" class="hint">Nenhuma forma de pagamento habilitada.</div>
+          <div class="checkout-scroll">
+            <h4 class="card-title mb-4">Forma de Pagamento</h4>
+            <div v-if="!checkoutMethods.length" class="hint">Nenhuma forma de pagamento habilitada.</div>
 
-          <div v-if="checkoutMethods.includes('pix')" class="payment-method" data-method="pix">
-            <label class="d-flex align-items-center">
-              <input
-                type="radio"
-                name="forma_pagamento"
-                value="pix"
-                :checked="checkoutMethod === 'pix'"
-                @change="setCheckoutMethod('pix')"
-              />
-              <div>
-                <strong>PIX</strong>
-                <p class="mb-0 text-muted">Pagamento instantaneo via PIX</p>
-              </div>
-            </label>
-            <div v-if="checkoutMethod === 'pix'" class="payment-details">
-              <div class="pix-info">
-                <h5>Pagamento via PIX</h5>
-                <p v-if="!checkoutPixData">Clique em "Confirmar Agendamento" para gerar o pagamento.</p>
-                <p v-else class="hint">{{ checkoutPixMessage }}</p>
-                <div class="pix-qr">
-                  <img
-                    v-if="checkoutPixData && checkoutPixData.qr_code && checkoutPixData.qr_code.encoded_image"
-                    :src="`data:image/png;base64,${checkoutPixData.qr_code.encoded_image}`"
-                    alt="QR Code PIX"
-                  />
-                  <span v-else class="text-muted">QR Code sera gerado aqui</span>
+            <div class="payment-methods-scroll">
+              <div v-if="checkoutMethods.includes('pix')" class="payment-method" data-method="pix">
+              <label class="d-flex align-items-center">
+                <input
+                  type="radio"
+                  name="forma_pagamento"
+                  value="pix"
+                  :checked="checkoutMethod === 'pix'"
+                  @change="setCheckoutMethod('pix')"
+                />
+                <div>
+                  <strong>PIX</strong>
+                  <p class="mb-0 text-muted">Pagamento instantaneo via PIX</p>
                 </div>
-                <div v-if="checkoutPixData && checkoutPixData.qr_code && checkoutPixData.qr_code.payload" class="pix-code">
-                  {{ checkoutPixData.qr_code.payload }}
+              </label>
+              <div v-if="checkoutMethod === 'pix'" class="payment-details">
+                <div class="pix-info">
+                  <h5>Pagamento via PIX</h5>
+                  <p v-if="!checkoutPixData">Clique em "Confirmar Agendamento" para gerar o pagamento.</p>
+                  <p v-else class="hint">{{ checkoutPixMessage }}</p>
+                  <div class="pix-qr">
+                    <img
+                      v-if="checkoutPixData && checkoutPixData.qr_code && checkoutPixData.qr_code.encoded_image"
+                      :src="`data:image/png;base64,${checkoutPixData.qr_code.encoded_image}`"
+                      alt="QR Code PIX"
+                    />
+                    <span v-else class="text-muted">QR Code sera gerado aqui</span>
+                  </div>
+                  <div v-if="checkoutPixData && checkoutPixData.qr_code && checkoutPixData.qr_code.payload" class="pix-code">
+                    {{ checkoutPixData.qr_code.payload }}
+                  </div>
+                  <p v-if="checkoutPixExpiration" class="hint">
+                    Valido ate: {{ checkoutPixExpiration }}
+                  </p>
                 </div>
-                <p v-if="checkoutPixExpiration" class="hint">
-                  Valido ate: {{ checkoutPixExpiration }}
-                </p>
               </div>
             </div>
-          </div>
 
-          <div v-if="checkoutMethods.includes('cartao')" class="payment-method" data-method="card">
-            <label class="d-flex align-items-center">
-              <input
-                type="radio"
-                name="forma_pagamento"
-                value="cartao"
-                :checked="checkoutMethod === 'cartao'"
-                @change="setCheckoutMethod('cartao')"
-              />
-              <div>
-                <strong>Cartao de Credito</strong>
-                <p class="mb-0 text-muted">Pagamento seguro com cartao</p>
-              </div>
-            </label>
-            <div v-if="checkoutMethod === 'cartao'" class="payment-details card-form">
-              <div class="form-grid">
-                <label class="field">
-                  <span>Nome no Cartao</span>
-                  <input type="text" :value="checkoutCard.name" @input="setCheckoutCard('name', $event.target.value)" />
-                </label>
-                <label class="field">
-                  <span>Numero do Cartao</span>
-                  <input
-                    type="text"
-                    :value="checkoutCard.number"
-                    @input="setCheckoutCard('number', $event.target.value)"
-                    maxlength="19"
-                  />
-                </label>
+            <div v-if="checkoutMethods.includes('cartao')" class="payment-method" data-method="card">
+              <label class="d-flex align-items-center">
+                <input
+                  type="radio"
+                  name="forma_pagamento"
+                  value="cartao"
+                  :checked="checkoutMethod === 'cartao'"
+                  @change="setCheckoutMethod('cartao')"
+                />
+                <div>
+                  <strong>Cartao de Credito</strong>
+                  <p class="mb-0 text-muted">Pagamento seguro com cartao</p>
+                </div>
+              </label>
+              <div v-if="checkoutMethod === 'cartao'" class="payment-details card-form">
                 <div class="form-grid">
                   <label class="field">
-                    <span>Validade</span>
-                    <input
-                      type="text"
-                      :value="checkoutCard.expiry"
-                      @input="setCheckoutCard('expiry', $event.target.value)"
-                      maxlength="5"
-                    />
+                    <span>Nome no Cartao</span>
+                    <input type="text" :value="checkoutCard.name" @input="setCheckoutCard('name', $event.target.value)" />
                   </label>
                   <label class="field">
-                    <span>CVV</span>
+                    <span>Numero do Cartao</span>
                     <input
                       type="text"
-                      :value="checkoutCard.cvv"
-                      @input="setCheckoutCard('cvv', $event.target.value)"
-                      maxlength="4"
+                      :value="checkoutCard.number"
+                      @input="setCheckoutCard('number', $event.target.value)"
+                      maxlength="19"
                     />
                   </label>
-                </div>
-                <label class="field">
-                  <span>CPF do Portador</span>
-                  <input type="text" :value="checkoutCard.cpf" @input="setCheckoutCard('cpf', $event.target.value)" />
-                </label>
-              </div>
-            </div>
-          </div>
-
-          <div v-if="checkoutMethods.includes('presencial')" class="payment-method" data-method="presencial">
-            <label class="d-flex align-items-center">
-              <input
-                type="radio"
-                name="forma_pagamento"
-                value="presencial"
-                :checked="checkoutMethod === 'presencial'"
-                @change="setCheckoutMethod('presencial')"
-              />
-              <div>
-                <strong>Pagamento no Dia</strong>
-                <p class="mb-0 text-muted">Pague diretamente ao professor no dia da aula</p>
-              </div>
-            </label>
-            <div v-if="checkoutMethod === 'presencial'" class="payment-details">
-              <div class="alert alert-info">
-                <h5>Pagamento Presencial</h5>
-                <p>Voce pagara diretamente ao professor no dia da aula.</p>
-                <div class="form-grid">
+                  <div class="form-grid">
+                    <label class="field">
+                      <span>Validade</span>
+                      <input
+                        type="text"
+                        :value="checkoutCard.expiry"
+                        @input="setCheckoutCard('expiry', $event.target.value)"
+                        maxlength="5"
+                      />
+                    </label>
+                    <label class="field">
+                      <span>CVV</span>
+                      <input
+                        type="text"
+                        :value="checkoutCard.cvv"
+                        @input="setCheckoutCard('cvv', $event.target.value)"
+                        maxlength="4"
+                      />
+                    </label>
+                  </div>
                   <label class="field">
-                    <span>Status do Pagamento</span>
-                    <select :value="checkoutStatus" @change="setCheckoutStatus($event.target.value)">
-                      <option value="PENDING">Pendente (pagar no dia)</option>
-                      <option value="RECEIVED">Confirmado (pago agora)</option>
-                    </select>
+                    <span>CPF do Portador</span>
+                    <input type="text" :value="checkoutCard.cpf" @input="setCheckoutCard('cpf', $event.target.value)" />
                   </label>
                 </div>
               </div>
             </div>
-          </div>
 
-          <div class="actions">
-            <button class="primary-btn" @click="confirmCheckout">Confirmar Agendamento</button>
-          </div>
-          <div v-if="checkoutMethod === 'pix' && checkoutPixFinalizeReady" class="actions">
-            <button class="secondary-btn" @click="finalizeCheckout">Finalizar Agendamento</button>
+            <div v-if="checkoutMethods.includes('presencial')" class="payment-method" data-method="presencial">
+              <label class="d-flex align-items-center">
+                <input
+                  type="radio"
+                  name="forma_pagamento"
+                  value="presencial"
+                  :checked="checkoutMethod === 'presencial'"
+                  @change="setCheckoutMethod('presencial')"
+                />
+                <div>
+                  <strong>Pagamento no Dia</strong>
+                  <p class="mb-0 text-muted">Pague diretamente ao professor no dia da aula</p>
+                </div>
+              </label>
+              <div v-if="checkoutMethod === 'presencial'" class="payment-details">
+                <div class="alert alert-info">
+                  <h5>Pagamento Presencial</h5>
+                  <p>Voce pagara diretamente ao professor no dia da aula.</p>
+                  <div class="form-grid">
+                    <label class="field">
+                      <span>Status do Pagamento</span>
+                      <select :value="checkoutStatus" @change="setCheckoutStatus($event.target.value)">
+                        <option value="PENDING">Pendente (pagar no dia)</option>
+                        <option value="RECEIVED">Confirmado (pago agora)</option>
+                      </select>
+                    </label>
+                  </div>
+                </div>
+              </div>
+            </div>
+            </div>
+
+            <div class="actions">
+              <button class="primary-btn" @click="confirmCheckout">Confirmar Agendamento</button>
+            </div>
+            <div v-if="checkoutMethod === 'pix' && checkoutPixFinalizeReady" class="actions">
+              <button class="secondary-btn" @click="finalizeCheckout">Finalizar Agendamento</button>
+            </div>
           </div>
         </div>
       </div>

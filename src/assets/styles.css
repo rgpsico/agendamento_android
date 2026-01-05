@@ -391,6 +391,25 @@ body {
   gap: 10px;
 }
 
+.payment-methods-scroll {
+  padding-right: 6px;
+}
+
+.checkout-modal {
+  max-height: 85vh;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
+
+.checkout-scroll {
+  max-height: 55vh;
+  overflow-y: auto;
+  padding-right: 6px;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
+
 .payment-details {
   padding-top: 6px;
 }
