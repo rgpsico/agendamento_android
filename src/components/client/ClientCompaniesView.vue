@@ -1,8 +1,22 @@
 <template>
   <section class="view client-companies">
     <div class="view-header">
-      <h3>Empresas</h3>
-      <p class="header-subtitle">Escolha uma empresa para agendar</p>
+      <div class="header-content">
+        <h3>Empresas</h3>
+        <p class="header-subtitle">Escolha uma empresa para agendar</p>
+      </div>
+      <div class="company-search">
+        <svg class="search-icon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="11" cy="11" r="8"></circle>
+          <path d="m21 21-4.35-4.35"></path>
+        </svg>
+        <input
+          v-model.trim="companySearch"
+          type="text"
+          placeholder="Buscar empresa..."
+          aria-label="Filtrar empresas por nome"
+        />
+      </div>
     </div>
 
     <div v-if="clientCompaniesLoading" class="loading-state">
@@ -11,65 +25,80 @@
     </div>
 
     <div v-if="clientCompaniesError" class="error-state">
-      <p class="error">{{ clientCompaniesError }}</p>
+      <div class="error-card">
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="10"></circle>
+          <line x1="12" y1="8" x2="12" y2="12"></line>
+          <line x1="12" y1="16" x2="12.01" y2="16"></line>
+        </svg>
+        <p class="error-message">{{ clientCompaniesError }}</p>
+      </div>
     </div>
 
-    <div class="companies-list" v-if="clientCompanies.length && !clientCompaniesLoading">
+    <div class="companies-list" v-if="filteredCompanies.length && !clientCompaniesLoading">
       <div
-        v-for="company in clientCompanies"
+        v-for="company in filteredCompanies"
         :key="company.id"
         class="company-card"
         @click="selectCompany(company)"
       >
-        <div class="company-image-wrapper">
-          <img
-            v-if="companyImageUrl(company)"
-            :src="companyImageUrl(company)"
-            alt="Imagem da empresa"
-            class="company-image"
-          />
-          <div v-else class="company-placeholder">
-            <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
-              <polyline points="9 22 9 12 15 12 15 22"></polyline>
-            </svg>
+        <div class="company-visual">
+          <div class="company-image-wrapper">
+            <img
+              v-if="companyImageUrl(company)"
+              :src="companyImageUrl(company)"
+              alt="Imagem da empresa"
+              class="company-image"
+            />
+            <div v-else class="company-placeholder">
+              <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+                <polyline points="9 22 9 12 15 12 15 22"></polyline>
+              </svg>
+            </div>
           </div>
         </div>
 
         <div class="company-content">
-          <div class="company-header">
+          <div class="company-info">
             <h4 class="company-name">{{ company.nome }}</h4>
-            <svg class="chevron-icon" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            
+            <div class="company-meta">
+              <span class="company-location">
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
+                  <circle cx="12" cy="10" r="3"></circle>
+                </svg>
+                {{ companyCityLabel(company) }}
+              </span>
+            </div>
+
+            <p class="company-description">
+              {{ company.descricao || companyDescricaoLabel(company) }}
+            </p>
+          </div>
+
+          <div class="company-footer">
+            <span class="action-text">Ver serviços</span>
+            <svg class="chevron-icon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
               <polyline points="9 18 15 12 9 6"></polyline>
             </svg>
-          </div>
-          
-          <p class="company-location">
-            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
-              <circle cx="12" cy="10" r="3"></circle>
-            </svg>
-            {{ companyCityLabel(company) }}
-          </p>
-
-          <p class="company-description">
-            {{ company.descricao || companyDescricaoLabel(company) }}
-          </p>
-
-          <div class="company-action">
-            <span class="action-text">Ver serviços</span>
           </div>
         </div>
       </div>
     </div>
 
-    <div v-if="!clientCompanies.length && !clientCompaniesLoading && !clientCompaniesError" class="empty-state">
-      <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
-        <polyline points="9 22 9 12 15 12 15 22"></polyline>
-      </svg>
-      <p class="empty-title">Nenhuma empresa disponível</p>
-      <p class="empty-subtitle">Não há empresas cadastradas no momento</p>
+    <div v-if="!filteredCompanies.length && !clientCompaniesLoading && !clientCompaniesError" class="empty-state">
+      <div class="empty-icon">
+        <svg xmlns="http://www.w3.org/2000/svg" width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+          <polyline points="9 22 9 12 15 12 15 22"></polyline>
+        </svg>
+      </div>
+      <p class="empty-title">Nenhuma empresa encontrada</p>
+      <p class="empty-subtitle">
+        {{ companySearch ? 'Tente buscar com outro termo' : 'Não há empresas cadastradas no momento' }}
+      </p>
     </div>
   </section>
 </template>
@@ -77,6 +106,20 @@
 <script>
 export default {
   name: "ClientCompaniesView",
+  data() {
+    return {
+      companySearch: ""
+    };
+  },
+  computed: {
+    filteredCompanies() {
+      if (!this.companySearch) return this.clientCompanies;
+      const query = this.companySearch.toLowerCase();
+      return this.clientCompanies.filter((company) =>
+        String(company.nome || "").toLowerCase().includes(query)
+      );
+    }
+  },
   props: {
     clientCompanies: {
       type: Array,
@@ -113,27 +156,74 @@ export default {
 <style scoped>
 .client-companies {
   padding: 0;
+  min-height: 100vh;
+  background: #f8fafc;
 }
 
+/* Header */
 .view-header {
-  padding: 20px 20px 16px;
-  background: #fff;
-  border-bottom: 1px solid var(--border);
+  padding: 10px 14px 10px;
+  background: linear-gradient(135deg, #1f5fbf 0%, #1a4d99 100%);
   position: sticky;
   top: 0;
-  z-index: 5;
+  z-index: 10;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.header-content {
+  margin-bottom: 8px;
 }
 
 .view-header h3 {
-  margin: 0 0 4px 0;
-  font-size: 24px;
-  color: var(--text);
+  margin: 0 0 3px 0;
+  font-size: 20px;
+  font-weight: 700;
+  color: #ffffff;
+  letter-spacing: -0.5px;
 }
 
 .header-subtitle {
   margin: 0;
-  font-size: 14px;
-  color: var(--muted);
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.85);
+  font-weight: 400;
+}
+
+/* Search */
+.company-search {
+  position: relative;
+}
+
+.search-icon {
+  position: absolute;
+  left: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #64748b;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.company-search input {
+  width: 100%;
+  padding: 9px 14px 9px 40px;
+  border-radius: 12px;
+  border: none;
+  background: #ffffff;
+  color: #0f172a;
+  font-size: 13px;
+  font-weight: 500;
+  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.06);
+  transition: all 0.2s ease;
+}
+
+.company-search input::placeholder {
+  color: #94a3b8;
+}
+
+.company-search input:focus {
+  outline: none;
+  box-shadow: 0 4px 16px rgba(31, 95, 191, 0.15);
 }
 
 /* Loading State */
@@ -142,17 +232,17 @@ export default {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 60px 20px;
-  gap: 16px;
+  padding: 80px 20px;
+  gap: 20px;
 }
 
 .spinner {
-  width: 40px;
-  height: 40px;
-  border: 3px solid var(--border);
-  border-top-color: var(--primary);
+  width: 48px;
+  height: 48px;
+  border: 3px solid #e2e8f0;
+  border-top-color: #1f5fbf;
   border-radius: 50%;
-  animation: spin 0.8s linear infinite;
+  animation: spin 0.7s linear infinite;
 }
 
 @keyframes spin {
@@ -160,23 +250,37 @@ export default {
 }
 
 .loading-state p {
-  color: var(--muted);
-  font-size: 14px;
+  color: #64748b;
+  font-size: 15px;
+  font-weight: 500;
 }
 
 /* Error State */
 .error-state {
-  padding: 20px;
+  padding: 20px 16px;
 }
 
-.error {
-  color: var(--danger);
-  background: rgba(239, 68, 68, 0.1);
-  padding: 16px;
-  border-radius: 12px;
-  text-align: center;
+.error-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  background: #fef2f2;
+  border: 1.5px solid #fecaca;
+  padding: 18px;
+  border-radius: 14px;
+}
+
+.error-card svg {
+  flex-shrink: 0;
+  color: #dc2626;
+}
+
+.error-message {
+  color: #991b1b;
   font-size: 14px;
+  font-weight: 500;
   margin: 0;
+  line-height: 1.5;
 }
 
 /* Empty State */
@@ -185,28 +289,39 @@ export default {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 80px 20px;
+  padding: 100px 24px;
   text-align: center;
-  gap: 12px;
 }
 
-.empty-state svg {
-  color: var(--muted);
-  opacity: 0.3;
-  margin-bottom: 8px;
+.empty-icon {
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 20px;
+}
+
+.empty-icon svg {
+  color: #94a3b8;
 }
 
 .empty-title {
-  font-size: 18px;
-  font-weight: 600;
-  color: var(--text);
-  margin: 0;
+  font-size: 19px;
+  font-weight: 700;
+  color: #0f172a;
+  margin: 0 0 8px 0;
+  letter-spacing: -0.3px;
 }
 
 .empty-subtitle {
   font-size: 14px;
-  color: var(--muted);
+  color: #64748b;
   margin: 0;
+  line-height: 1.5;
+  max-width: 280px;
 }
 
 /* Companies List */
@@ -214,36 +329,54 @@ export default {
   display: flex;
   flex-direction: column;
   gap: 12px;
-  padding: 16px;
+  padding: 20px 16px 24px;
 }
 
 .company-card {
   display: flex;
-  gap: 16px;
-  background: #fff;
-  border-radius: 16px;
-  padding: 16px;
-  border: 2px solid var(--border);
+  gap: 14px;
+  background: #ffffff;
+  border-radius: 18px;
+  padding: 14px;
+  border: none;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
   -webkit-tap-highlight-color: transparent;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+  position: relative;
+  overflow: hidden;
+}
+
+.company-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, rgba(31, 95, 191, 0.03) 0%, rgba(31, 95, 191, 0.01) 100%);
+  opacity: 0;
+  transition: opacity 0.25s ease;
 }
 
 .company-card:active {
-  transform: scale(0.98);
-  border-color: var(--primary);
-  box-shadow: 0 4px 12px rgba(31, 95, 191, 0.15);
+  transform: scale(0.97);
+  box-shadow: 0 8px 24px rgba(31, 95, 191, 0.15);
 }
 
-/* Company Image */
-.company-image-wrapper {
+.company-card:active::before {
+  opacity: 1;
+}
+
+/* Company Visual */
+.company-visual {
   flex-shrink: 0;
-  width: 80px;
-  height: 80px;
-  border-radius: 12px;
+}
+
+.company-image-wrapper {
+  width: 90px;
+  height: 90px;
+  border-radius: 14px;
   overflow: hidden;
-  background: var(--background);
-  border: 1px solid var(--border);
+  background: #f8fafc;
+  border: 1.5px solid #e2e8f0;
 }
 
 .company-image {
@@ -258,8 +391,11 @@ export default {
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--muted);
-  background: linear-gradient(135deg, #f0f4f8 0%, #e7eef5 100%);
+  background: linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%);
+}
+
+.company-placeholder svg {
+  color: #94a3b8;
 }
 
 /* Company Content */
@@ -267,71 +403,85 @@ export default {
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  justify-content: space-between;
   min-width: 0;
+  padding: 4px 0;
 }
 
-.company-header {
+.company-info {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
+  flex-direction: column;
+  gap: 6px;
 }
 
 .company-name {
   margin: 0;
   font-size: 17px;
-  font-weight: 600;
-  color: var(--text);
+  font-weight: 700;
+  color: #0f172a;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  letter-spacing: -0.3px;
+  line-height: 1.3;
 }
 
-.chevron-icon {
-  flex-shrink: 0;
-  color: var(--muted);
+.company-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 
 .company-location {
   display: flex;
   align-items: center;
-  gap: 6px;
-  margin: 0;
+  gap: 5px;
   font-size: 13px;
-  color: var(--muted);
+  color: #64748b;
+  font-weight: 500;
 }
 
 .company-location svg {
   flex-shrink: 0;
+  color: #94a3b8;
 }
 
 .company-description {
   margin: 0;
-  font-size: 14px;
-  color: var(--text);
-  line-height: 1.4;
+  font-size: 13px;
+  color: #475569;
+  line-height: 1.5;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
+  font-weight: 400;
 }
 
-.company-action {
-  margin-top: 4px;
+.company-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 2px;
 }
 
 .action-text {
   font-size: 14px;
-  font-weight: 600;
-  color: var(--primary);
+  font-weight: 700;
+  color: #1f5fbf;
+  letter-spacing: -0.2px;
+}
+
+.chevron-icon {
+  color: #1f5fbf;
+  flex-shrink: 0;
 }
 
 /* Responsive */
-@media (max-width: 380px) {
+@media (max-width: 360px) {
   .company-image-wrapper {
-    width: 70px;
-    height: 70px;
+    width: 76px;
+    height: 76px;
   }
 
   .company-name {
@@ -339,20 +489,41 @@ export default {
   }
 
   .company-description {
-    font-size: 13px;
+    font-size: 12.5px;
   }
 }
 
 @media (min-width: 768px) {
   .companies-list {
-    grid-template-columns: repeat(2, 1fr);
     display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 16px;
+  }
+
+  .company-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 12px 32px rgba(31, 95, 191, 0.12);
+  }
+
+  .company-card:hover::before {
+    opacity: 1;
   }
 }
 
 @media (min-width: 1024px) {
   .companies-list {
     grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (min-width: 1280px) {
+  .view-header {
+    padding: 24px 24px 28px;
+  }
+
+  .companies-list {
+    padding: 28px 24px 32px;
+    gap: 18px;
   }
 }
 </style>

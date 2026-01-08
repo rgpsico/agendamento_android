@@ -123,6 +123,7 @@
       :company-city-label="companyCityLabel"
       :company-descricao-label="companyDescricaoLabel"
       :company-image-url="companyImageUrl"
+      :service-image-url="serviceImageUrl"
       :set-client-schedule-date="setClientScheduleDate"
       :open-checkout="openClientCheckout"
       :close-checkout="closeClientCheckout"

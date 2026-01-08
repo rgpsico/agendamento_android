@@ -1,30 +1,8 @@
 <template>
-  <div class="app-layout">
-    <div v-if="showClientSidebar" class="sidebar-backdrop" @click="closeClientSidebar"></div>
-    <aside class="sidebar" :class="{ open: showClientSidebar }">
-      <div class="sidebar-header">
-        <h1>Agenda Pro</h1>
-        <p class="subtitle">Menu Cliente</p>
-      </div>
-      <nav class="sidebar-nav">
-        <button :class="{ active: clientTab === 'companies' }" @click="goToClientTab('companies')">
-          Empresas
-        </button>
-        <button :class="{ active: clientTab === 'services' }" @click="goToClientTab('services')">
-          Servicos
-        </button>
-        <button :class="{ active: clientTab === 'bookings' }" @click="goToClientTab('bookings')">
-          Meus Horarios
-        </button>
-        <button :class="{ active: clientTab === 'profile' }" @click="goToClientTab('profile')">
-          Perfil
-        </button>
-      </nav>
-    </aside>
-
+  <div class="app-layout client-layout">
     <div class="app-main">
       <header class="topbar">
-        <button class="icon-btn" @click="toggleClientSidebar">Menu</button>
+        <div class="topbar-spacer"></div>
         <div class="topbar-info">
           <p class="label">Cliente</p>
           <h2>{{ clientProfile.nome || "Cliente" }}</h2>
@@ -50,6 +28,7 @@
           :client-services-error="clientServicesError"
           :selected-company="selectedCompany"
           :client-services-for-company="clientServicesForCompany"
+          :service-image-url="serviceImageUrl"
           :select-service="selectService"
           :go-to-client-tab="goToClientTab"
         />
@@ -68,6 +47,44 @@
         />
       </main>
     </div>
+
+    <nav class="bottom-nav" aria-label="Menu principal">
+      <button
+        class="bottom-nav-btn"
+        :class="{ active: clientTab === 'companies' }"
+        @click="goToClientTab('companies')"
+      >
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" fill="none" stroke="currentColor" stroke-width="2"></path>
+          <polyline points="9 22 9 12 15 12 15 22" fill="none" stroke="currentColor" stroke-width="2"></polyline>
+        </svg>
+        <span>Empresas</span>
+      </button>
+      <button
+        class="bottom-nav-btn"
+        :class="{ active: clientTab === 'bookings' }"
+        @click="goToClientTab('bookings')"
+      >
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <rect x="3" y="5" width="18" height="16" rx="2" ry="2" fill="none" stroke="currentColor" stroke-width="2"></rect>
+          <line x1="16" y1="3" x2="16" y2="7" stroke="currentColor" stroke-width="2"></line>
+          <line x1="8" y1="3" x2="8" y2="7" stroke="currentColor" stroke-width="2"></line>
+          <line x1="3" y1="11" x2="21" y2="11" stroke="currentColor" stroke-width="2"></line>
+        </svg>
+        <span>Horarios</span>
+      </button>
+      <button
+        class="bottom-nav-btn"
+        :class="{ active: clientTab === 'profile' }"
+        @click="goToClientTab('profile')"
+      >
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <circle cx="12" cy="8" r="4" fill="none" stroke="currentColor" stroke-width="2"></circle>
+          <path d="M4 20c2-4 6-6 8-6s6 2 8 6" fill="none" stroke="currentColor" stroke-width="2"></path>
+        </svg>
+        <span>Perfil</span>
+      </button>
+    </nav>
 
     <ClientSlotsModal
       :show-slots-modal="showSlotsModal"
@@ -258,6 +275,10 @@ export default {
       required: true
     },
     companyImageUrl: {
+      type: Function,
+      required: true
+    },
+    serviceImageUrl: {
       type: Function,
       required: true
     },

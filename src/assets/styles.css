@@ -134,6 +134,23 @@ body {
   min-height: 100vh;
 }
 
+.client-layout {
+  flex-direction: column;
+}
+
+.client-layout .sidebar,
+.client-layout .sidebar-backdrop {
+  display: none;
+}
+
+.client-layout .content {
+  padding-bottom: 90px;
+}
+
+.client-layout .topbar-spacer {
+  width: 64px;
+}
+
 .sidebar {
   width: 240px;
   background: var(--card);
@@ -143,7 +160,7 @@ body {
   flex-direction: column;
   gap: 20px;
   position: relative;
-  z-index: 2;
+  z-index: 20;
 }
 
 .sidebar-header h1 {
@@ -416,6 +433,43 @@ body {
   display: none;
 }
 
+.bottom-nav {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 64px;
+  background: var(--card);
+  border-top: 1px solid var(--border);
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  align-items: center;
+  z-index: 30;
+}
+
+.bottom-nav-btn {
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  display: grid;
+  gap: 4px;
+  align-items: center;
+  justify-items: center;
+  font-size: 11px;
+  padding: 6px 0;
+  cursor: pointer;
+}
+
+.bottom-nav-btn svg {
+  width: 22px;
+  height: 22px;
+}
+
+.bottom-nav-btn.active {
+  color: var(--primary);
+  font-weight: 600;
+}
+
 @media (min-width: 900px) {
   .cards {
     grid-template-columns: repeat(3, 1fr);
@@ -446,7 +500,7 @@ body {
     position: fixed;
     inset: 0;
     background: rgba(8, 17, 28, 0.35);
-    z-index: 1;
+    z-index: 15;
   }
 
   .topbar {

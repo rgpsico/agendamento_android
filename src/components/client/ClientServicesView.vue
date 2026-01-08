@@ -14,6 +14,15 @@
         class="card clickable"
         @click="selectService(service)"
       >
+        <div class="service-image-wrapper">
+          <img
+            v-if="service.imagem && serviceImageUrl"
+            :src="serviceImageUrl(service.imagem)"
+            alt="Imagem do servico"
+            class="service-image"
+          />
+          <div v-else class="service-image-placeholder">Sem imagem</div>
+        </div>
         <p class="card-title">{{ service.titulo || service.nome || "Servico" }}</p>
         <p class="card-subtitle">
           {{ service.tempo_de_aula || service.duracao || "-" }} min | R$ {{ service.preco || "-" }}
@@ -48,6 +57,10 @@ export default {
       type: Array,
       required: true
     },
+    serviceImageUrl: {
+      type: Function,
+      required: true
+    },
     selectService: {
       type: Function,
       required: true
@@ -59,3 +72,33 @@ export default {
   }
 };
 </script>
+
+<style scoped>
+.service-image-wrapper {
+  width: 100%;
+  height: 150px;
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--background);
+  border: 1px solid var(--border);
+  margin-bottom: 8px;
+}
+
+.service-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.service-image-placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted);
+  background: linear-gradient(135deg, #f0f4f8 0%, #e7eef5 100%);
+  font-size: 13px;
+}
+</style>
