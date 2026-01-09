@@ -71,6 +71,25 @@
                 </svg>
                 {{ companyCityLabel(company) }}
               </span>
+
+              <div class="company-rating" aria-label="Avaliacao da empresa">
+                <div class="stars" aria-hidden="true">
+                  <span
+                    v-for="index in 5"
+                    :key="index"
+                    class="star"
+                    :class="{ filled: index <= Math.round(companyRating(company)) }"
+                  >
+                    ★
+                  </span>
+                </div>
+                <span class="rating-value">
+                  {{ formatRating(companyRating(company)) }}
+                </span>
+                <span v-if="companyRatingCount(company)" class="rating-count">
+                  ({{ companyRatingCount(company) }})
+                </span>
+              </div>
             </div>
 
             <p class="company-description">
@@ -148,6 +167,51 @@ export default {
     companyImageUrl: {
       type: Function,
       required: true
+    }
+  },
+  methods: {
+    companyRating(company) {
+      const ratingSource = company?.avaliacao ?? company?.rating ?? company?.nota;
+      if (ratingSource == null) return 0;
+
+      if (typeof ratingSource === "number") {
+        return this.normalizeRating(ratingSource);
+      }
+
+      if (Array.isArray(ratingSource)) {
+        if (!ratingSource.length) return 0;
+        const values = ratingSource
+          .map((item) => {
+            if (typeof item === "number") return item;
+            if (!item || typeof item !== "object") return null;
+            return item.nota ?? item.avaliacao ?? item.rating ?? item.pontuacao ?? item.media ?? null;
+          })
+          .filter((value) => Number.isFinite(value));
+
+        if (!values.length) return 0;
+        const total = values.reduce((sum, value) => sum + value, 0);
+        return this.normalizeRating(total / values.length);
+      }
+
+      if (typeof ratingSource === "object") {
+        const value = ratingSource.media ?? ratingSource.nota ?? ratingSource.avaliacao ?? ratingSource.rating ?? 0;
+        return this.normalizeRating(Number(value) || 0);
+      }
+
+      return 0;
+    },
+    companyRatingCount(company) {
+      const ratingSource = company?.avaliacao;
+      if (Array.isArray(ratingSource)) return ratingSource.length;
+      return company?.avaliacao_count ?? company?.rating_count ?? 0;
+    },
+    normalizeRating(value) {
+      if (!Number.isFinite(value)) return 0;
+      return Math.max(0, Math.min(5, value));
+    },
+    formatRating(value) {
+      const safeValue = Number.isFinite(value) ? value : 0;
+      return safeValue ? safeValue.toFixed(1).replace(".", ",") : "0,0";
     }
   }
 };
@@ -430,6 +494,7 @@ export default {
   display: flex;
   align-items: center;
   gap: 10px;
+  flex-wrap: wrap;
 }
 
 .company-location {
@@ -444,6 +509,42 @@ export default {
 .company-location svg {
   flex-shrink: 0;
   color: #94a3b8;
+}
+
+.company-rating {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: #64748b;
+  font-weight: 600;
+}
+
+.stars {
+  display: inline-flex;
+  gap: 2px;
+  line-height: 1;
+}
+
+.star {
+  font-size: 12px;
+  color: #cbd5f5;
+}
+
+.star.filled {
+  color: #f59e0b;
+}
+
+.rating-value {
+  font-size: 12px;
+  color: #475569;
+  font-weight: 700;
+}
+
+.rating-count {
+  font-size: 12px;
+  color: #94a3b8;
+  font-weight: 600;
 }
 
 .company-description {

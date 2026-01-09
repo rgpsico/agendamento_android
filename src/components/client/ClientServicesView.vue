@@ -2,7 +2,16 @@
   <section class="view client-services">
     <div class="view-header">
       <h3>Servicos</h3>
-      <button class="text-btn" @click="goToClientTab('companies')">Trocar empresa</button>
+      <div class="header-actions">
+        <button class="text-btn" @click="goToClientTab('companies')">Trocar empresa</button>
+        <button
+          class="text-btn save-btn"
+          :disabled="!selectedCompany || isCompanySaved"
+          @click="saveClientCompany"
+        >
+          {{ isCompanySaved ? "Empresa salva" : "Salvar empresa" }}
+        </button>
+      </div>
     </div>
     <p v-if="clientServicesLoading" class="hint">Carregando servicos...</p>
     <p v-if="clientServicesError" class="error">{{ clientServicesError }}</p>
@@ -68,12 +77,39 @@ export default {
     goToClientTab: {
       type: Function,
       required: true
+    },
+    saveClientCompany: {
+      type: Function,
+      required: true
+    },
+    isCompanySaved: {
+      type: Boolean,
+      required: true
     }
   }
 };
 </script>
 
 <style scoped>
+.view-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.save-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
 .service-image-wrapper {
   width: 100%;
   height: 150px;

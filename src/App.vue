@@ -110,11 +110,13 @@
       :client-bookings-detailed="clientBookingsDetailed"
       :client-profile-saved="clientProfileSaved"
       :show-slots-modal="clientSlotsModalOpen"
+      :is-client-company-saved="isSelectedCompanySaved"
       :toggle-client-sidebar="toggleClientSidebar"
       :close-client-sidebar="closeClientSidebar"
       :go-to-client-tab="goToClientTab"
       :client-logout="clientLogout"
       :select-company="selectCompany"
+      :save-client-company="saveClientCompany"
       :select-service="selectService"
       :book-slot="bookSlot"
       :remove-client-booking="removeClientBooking"
@@ -165,7 +167,8 @@ const STORAGE = {
   STUDENTS: "agenda_students",
   CLIENT_TOKEN: "agenda_client_token",
   CLIENT_PROFILE: "agenda_client_profile",
-  CLIENT_BOOKINGS: "agenda_client_bookings"
+  CLIENT_BOOKINGS: "agenda_client_bookings",
+  CLIENT_COMPANY: "agenda_client_company_id"
 };
 
 const seedTeacher = { name: "Prof. Ana Silva", email: "prof@escola.com" };
@@ -396,7 +399,8 @@ export default {
       clientAvailabilityLoading: false,
       clientAvailabilityError: "",
       clientBookings: loadStorage(STORAGE.CLIENT_BOOKINGS, seedClientBookings),
-      selectedCompanyId: "",
+      selectedCompanyId: loadStorage(STORAGE.CLIENT_COMPANY, ""),
+      savedClientCompanyId: loadStorage(STORAGE.CLIENT_COMPANY, ""),
       selectedServiceId: "",
       clientScheduleDate: todayISO(),
       clientSlotsModalOpen: false,
@@ -601,6 +605,10 @@ export default {
       if (!this.availabilityQuery.date) return "-";
       const day = getDayNumber(this.availabilityQuery.date);
       return WEEKDAY_LABELS[day] || "-";
+    },
+    isSelectedCompanySaved() {
+      if (!this.selectedCompanyId || !this.savedClientCompanyId) return false;
+      return String(this.selectedCompanyId) === String(this.savedClientCompanyId);
     }
   },
   watch: {
@@ -618,6 +626,9 @@ export default {
       this.activePortal = "cliente";
     }
     this.fetchClientCompanies();
+    if (this.clientAuthenticated) {
+      this.fetchClientBookings();
+    }
     if (!this.availabilityQuery.serviceId && this.services.length) {
       this.availabilityQuery.serviceId = this.services[0].id;
     }
@@ -668,6 +679,11 @@ export default {
       this.selectedServiceId = "";
       this.fetchClientServices(company.id);
       this.clientTab = "services";
+    },
+    saveClientCompany() {
+      if (!this.selectedCompanyId) return;
+      this.savedClientCompanyId = this.selectedCompanyId;
+      saveStorage(STORAGE.CLIENT_COMPANY, this.selectedCompanyId);
     },
     selectService(service) {
       this.selectedServiceId = service.id;
@@ -812,13 +828,42 @@ export default {
         return;
       }
       this.clientLoading = true;
-      localStorage.setItem(STORAGE.CLIENT_TOKEN, "cliente-demo");
-      this.clientAuthenticated = true;
-      this.activePortal = "cliente";
-      this.clientLoginForm.email = "";
-      this.clientLoginForm.password = "";
-      this.clientLoading = false;
-      this.fetchClientCompanies();
+      fetch(API_BASE + "/api/login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          email: this.clientLoginForm.email,
+          password: this.clientLoginForm.password
+        })
+      })
+        .then(async (response) => {
+          const data = await response.json().catch(() => ({}));
+          if (!response.ok) {
+            throw new Error(data.error || "Falha na autenticacao.");
+          }
+          if (!data.token) {
+            throw new Error("Token nao recebido.");
+          }
+          localStorage.setItem(STORAGE.CLIENT_TOKEN, data.token);
+          this.clientAuthenticated = true;
+          this.activePortal = "cliente";
+          if (this.savedClientCompanyId) {
+            this.selectedCompanyId = this.savedClientCompanyId;
+            this.clientTab = "services";
+          }
+          this.clientLoginForm.email = "";
+          this.clientLoginForm.password = "";
+          this.fetchClientCompanies();
+          this.fetchClientBookings();
+        })
+        .catch((error) => {
+          this.clientLoginError = error.message || "Erro ao autenticar.";
+        })
+        .finally(() => {
+          this.clientLoading = false;
+        });
     },
     logout() {
       this.isAuthenticated = false;
@@ -834,6 +879,10 @@ export default {
     },
     authHeaders() {
       const token = localStorage.getItem(STORAGE.TOKEN);
+      return token ? { Authorization: `Bearer ${token}` } : {};
+    },
+    clientAuthHeaders() {
+      const token = localStorage.getItem(STORAGE.CLIENT_TOKEN);
       return token ? { Authorization: `Bearer ${token}` } : {};
     },
     companyCityLabel(company) {
@@ -893,6 +942,17 @@ export default {
             throw new Error(data.error || "Erro ao carregar empresas.");
           }
           this.clientCompanies = Array.isArray(data) ? data : [];
+          if (this.selectedCompanyId) {
+            const savedCompany = this.clientCompanies.find(
+              (company) => String(company.id) === String(this.selectedCompanyId)
+            );
+            if (savedCompany) {
+              this.fetchClientServices(this.selectedCompanyId);
+              this.clientTab = "services";
+              return;
+            }
+            this.selectedCompanyId = "";
+          }
           if (!this.selectedCompanyId && this.clientCompanies.length) {
             this.selectedCompanyId = this.clientCompanies[0].id;
             this.fetchClientServices(this.selectedCompanyId);
@@ -904,6 +964,73 @@ export default {
         .finally(() => {
           this.clientCompaniesLoading = false;
         });
+    },
+    fetchClientBookings() {
+      const token = localStorage.getItem(STORAGE.CLIENT_TOKEN);
+      if (!token) return;
+      fetch(API_BASE+"/api/alunoadmin/aulas", {
+        headers: {
+          "Content-Type": "application/json",
+          ...this.clientAuthHeaders()
+        }
+      })
+        .then(async (response) => {
+          const data = await response.json().catch(() => []);
+          if (!response.ok) {
+            throw new Error(data.error || "Erro ao carregar agendamentos do cliente.");
+          }
+          const items = Array.isArray(data) ? data : data.data || [];
+          this.clientBookings = items.map((item) => this.normalizeClientBooking(item));
+          saveStorage(STORAGE.CLIENT_BOOKINGS, this.clientBookings);
+        })
+        .catch(() => {
+          // Mantem dados locais se a API falhar.
+        });
+    },
+    normalizeClientBooking(booking) {
+      const date =
+        booking.data ||
+        booking.date ||
+        booking.data_agendamento ||
+        booking.data_aula ||
+        "";
+      const time =
+        booking.horario ||
+        booking.time ||
+        booking.hora ||
+        booking.horario_aula ||
+        "";
+      const status =
+        booking.status ||
+        booking.situacao ||
+        booking.estado ||
+        "PENDING";
+      const serviceId =
+        booking.servico_id ||
+        booking.servico?.id ||
+        booking.serviceId ||
+        booking.servicoId ||
+        "";
+      const companyId =
+        booking.empresa_id ||
+        booking.empresa?.id ||
+        booking.companyId ||
+        booking.empresaId ||
+        booking.agenda_empresa_id ||
+        "";
+      const id =
+        booking.id ||
+        booking.agendamento_id ||
+        booking.aula_id ||
+        `${companyId}-${serviceId}-${date}-${time}`;
+      return {
+        id,
+        companyId,
+        serviceId,
+        date,
+        time,
+        status
+      };
     },
     fetchClientServices(empresaId) {
       if (!empresaId) return;

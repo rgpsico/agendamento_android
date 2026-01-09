@@ -31,6 +31,8 @@
           :service-image-url="serviceImageUrl"
           :select-service="selectService"
           :go-to-client-tab="goToClientTab"
+          :is-company-saved="isClientCompanySaved"
+          :save-client-company="saveClientCompany"
         />
 
         <ClientBookingsView
@@ -222,6 +224,10 @@ export default {
       type: Boolean,
       required: true
     },
+    isClientCompanySaved: {
+      type: Boolean,
+      required: true
+    },
     showSlotsModal: {
       type: Boolean,
       required: true
@@ -243,6 +249,10 @@ export default {
       required: true
     },
     selectCompany: {
+      type: Function,
+      required: true
+    },
+    saveClientCompany: {
       type: Function,
       required: true
     },
