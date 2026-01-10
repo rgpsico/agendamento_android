@@ -156,6 +156,7 @@ import ProfessorPortal from "./components/ProfessorPortal.vue";
 import ClientPortal from "./components/ClientPortal.vue";
 
 const API_BASE = "https://agendamento.rjpasseios.com.br";
+const ASSET_BASE = API_BASE;
 
 const STORAGE = {
   TOKEN: "agenda_token",
@@ -539,10 +540,13 @@ export default {
           this.clientCompanies.find((item) => item.id === booking.companyId) || {};
         const service =
           this.clientServices.find((item) => item.id === booking.serviceId) || {};
+        const companyName = company.nome || booking.companyName || "Empresa";
+        const serviceName =
+          service.titulo || service.nome || booking.serviceName || "Servico";
         return {
           ...booking,
-          companyName: company.nome || "Empresa",
-          serviceName: service.nome || "Servico",
+          companyName,
+          serviceName,
           dateLabel: formatDateLabel(booking.date)
         };
       });
@@ -762,8 +766,24 @@ export default {
       saveStorage(STORAGE.CLIENT_BOOKINGS, this.clientBookings);
     },
     removeClientBooking(id) {
-      this.clientBookings = this.clientBookings.filter((booking) => booking.id !== id);
-      saveStorage(STORAGE.CLIENT_BOOKINGS, this.clientBookings);
+      fetch(`${API_BASE}/api/agendamento/destroy/${id}`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...this.clientAuthHeaders()
+        }
+      })
+        .then(async (response) => {
+          const data = await response.json().catch(() => ({}));
+          if (!response.ok || data.success === false) {
+            throw new Error(data.error || data.message || "Erro ao cancelar agendamento.");
+          }
+          this.clientBookings = this.clientBookings.filter((booking) => booking.id !== id);
+          saveStorage(STORAGE.CLIENT_BOOKINGS, this.clientBookings);
+        })
+        .catch(() => {
+          // Mantem dados locais se a API falhar.
+        });
     },
     saveClientProfile() {
       this.clientProfileSaved = false;
@@ -906,10 +926,10 @@ export default {
       if (value.startsWith("http")) return value;
       const normalized = value.replace(/^\/+/, "");
       if (normalized.includes("/")) {
-        return `https://agendamento.rjpasseios.com.br/${normalized}`;
+        return `${ASSET_BASE}/${normalized}`;
       }
       const folder = avatar ? "avatar" : "banner";
-      return `https://agendamento.rjpasseios.com.br/${folder}/${normalized}`;
+      return `${ASSET_BASE}/${folder}/${normalized}`;
     },
     companyDescricaoLabel(company) {
       return (
@@ -979,7 +999,7 @@ export default {
           if (!response.ok) {
             throw new Error(data.error || "Erro ao carregar agendamentos do cliente.");
           }
-          const items = Array.isArray(data) ? data : data.data || [];
+          const items = Array.isArray(data) ? data : data.agendamentos || data.data || [];
           this.clientBookings = items.map((item) => this.normalizeClientBooking(item));
           saveStorage(STORAGE.CLIENT_BOOKINGS, this.clientBookings);
         })
@@ -989,22 +1009,32 @@ export default {
     },
     normalizeClientBooking(booking) {
       const date =
+        booking.data_da_aula ||
         booking.data ||
         booking.date ||
         booking.data_agendamento ||
         booking.data_aula ||
         "";
-      const time =
+      const rawTime =
         booking.horario ||
         booking.time ||
         booking.hora ||
         booking.horario_aula ||
         "";
-      const status =
+      const time = rawTime ? rawTime.slice(0, 5) : "";
+      const rawStatus =
         booking.status ||
         booking.situacao ||
         booking.estado ||
         "PENDING";
+      const statusMap = {
+        Espera: "PENDING",
+        Confirmado: "CONFIRMED",
+        Cancelado: "CANCELLED",
+        Concluido: "COMPLETED",
+        Pago: "RECEIVED"
+      };
+      const status = statusMap[rawStatus] || String(rawStatus).toUpperCase();
       const serviceId =
         booking.servico_id ||
         booking.servico?.id ||
@@ -1018,6 +1048,20 @@ export default {
         booking.empresaId ||
         booking.agenda_empresa_id ||
         "";
+      const companyName =
+        booking.empresa?.nome ||
+        booking.professor?.usuario?.nome ||
+        booking.empresa_nome ||
+        booking.companyName ||
+        "";
+      const serviceName =
+        booking.servico?.titulo ||
+        booking.servico?.nome ||
+        booking.modalidade?.nome ||
+        booking.servico_titulo ||
+        booking.servico_nome ||
+        booking.serviceName ||
+        "";
       const id =
         booking.id ||
         booking.agendamento_id ||
@@ -1027,6 +1071,8 @@ export default {
         id,
         companyId,
         serviceId,
+        companyName,
+        serviceName,
         date,
         time,
         status
@@ -1674,7 +1720,7 @@ export default {
     serviceImageUrl(filename) {
       if (!filename) return "";
       if (filename.startsWith("http")) return filename;
-      return `https://agendamento.rjpasseios.com.br/servico/${filename}`;
+      return `${ASSET_BASE}/servico/${filename}`;
     },
     startNewStudent() {
       this.resetStudentForm();
