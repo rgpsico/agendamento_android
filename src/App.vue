@@ -1435,9 +1435,8 @@ export default {
         return;
       }
       this.clientScheduleDate = this.clientCheckoutSummary.date || this.clientScheduleDate;
-      this.bookSlot(this.clientCheckoutSummary.time);
       this.clientCheckoutOpen = false;
-      this.clientTab = "bookings";
+      this.goToClientTab("bookings");
     },
     resetClientCheckoutPix() {
       this.clientCheckoutPixData = null;
@@ -1484,9 +1483,8 @@ export default {
             throw new Error(data.message || "Erro ao criar pagamento presencial.");
           }
           this.clientScheduleDate = this.clientCheckoutSummary.date || this.clientScheduleDate;
-          this.bookSlot(this.clientCheckoutSummary.time);
           this.clientCheckoutOpen = false;
-          this.clientTab = "bookings";
+          this.goToClientTab("bookings");
         })
         .catch((error) => {
           this.clientCheckoutError = error.message || "Erro ao criar pagamento presencial.";
