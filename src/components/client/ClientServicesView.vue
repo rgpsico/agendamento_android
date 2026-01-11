@@ -20,8 +20,7 @@
       <div
         v-for="service in clientServicesForCompany"
         :key="service.id"
-        class="card clickable"
-        @click="selectService(service)"
+        class="card"
       >
         <div class="company-badge">
           <div class="company-logo">
@@ -48,7 +47,9 @@
           {{ service.tempo_de_aula || service.duracao || "-" }} min | R$ {{ service.preco || "-" }}
         </p>
         <p class="subtitle">{{ service.descricao }}</p>
-        <button class="text-btn">Ver horarios</button>
+        <button class="text-btn" type="button" @click="selectService(service)">
+          Ver horarios
+        </button>
       </div>
     </div>
     <p v-if="selectedCompany && !clientServicesForCompany.length" class="hint">

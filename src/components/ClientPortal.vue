@@ -40,6 +40,7 @@
           v-if="clientTab === 'bookings'"
           :client-bookings-detailed="clientBookingsDetailed"
           :client-profile="clientProfile"
+          :fetch-waitlist-queue="fetchWaitlistQueue"
           :remove-client-booking="removeClientBooking"
         />
 
@@ -267,6 +268,10 @@ export default {
       required: true
     },
     removeClientBooking: {
+      type: Function,
+      required: true
+    },
+    fetchWaitlistQueue: {
       type: Function,
       required: true
     },

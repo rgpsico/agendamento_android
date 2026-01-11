@@ -63,7 +63,7 @@
 
           <!-- Ações -->
           <div class="booking-actions">
-            <button class="waitlist-btn" @click="openWaitlist(booking)">
+            <button class="waitlist-btn" type="button" @click="openWaitlist(booking)" v-if="isTodayBooking(booking)">
               <span class="btn-icon">
                 <svg viewBox="0 0 24 24" class="waitlist-icon" aria-hidden="true">
                   <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2" />
@@ -138,7 +138,10 @@
           Agendamentos do dia {{ waitlistBooking.dateLabel || "-" }}
         </p>
   
-        <div v-if="waitlistMeta" class="waitlist-summary">
+        <p v-if="waitlistLoading" class="hint">Carregando lista de espera...</p>
+        <p v-if="waitlistError" class="error">{{ waitlistError }}</p>
+
+        <div v-if="!waitlistLoading && !waitlistError && waitlistMeta" class="waitlist-summary">
           <div class="summary-item">
             <span class="summary-label">Sua posicao</span>
             <span class="summary-value">#{{ waitlistMeta.position }}</span>
@@ -153,7 +156,7 @@
           </div>
         </div>
   
-        <div v-if="waitlistQueue.length" class="waitlist-list">
+        <div v-if="!waitlistLoading && !waitlistError && waitlistQueue.length" class="waitlist-list">
           <div
             v-for="(item, index) in waitlistQueue"
             :key="item.id"
@@ -163,14 +166,20 @@
             <span class="waitlist-position">{{ index + 1 }}</span>
             <div class="waitlist-info">
               <span class="waitlist-name">
-                {{ item.id === waitlistBooking?.id ? (clientProfile?.nome || "Voce") : "Pessoa na fila" }}
+                {{
+                  item.id === waitlistBooking?.id
+                    ? (clientProfile?.nome || "Voce")
+                    : (item.studentName || "Pessoa na fila")
+                }}
               </span>
               <span class="waitlist-time">{{ item.time || "-" }}</span>
             </div>
           </div>
         </div>
   
-        <p v-else class="hint">Nenhum agendamento encontrado para o dia.</p>
+        <p v-if="!waitlistLoading && !waitlistError && !waitlistQueue.length" class="hint">
+          Nenhum agendamento encontrado para o dia.
+        </p>
   
         <div class="modal-actions">
           <button class="modal-btn cancel-close" @click="closeWaitlistModal">
@@ -194,6 +203,10 @@ export default {
       type: Object,
       required: true
     },
+    fetchWaitlistQueue: {
+      type: Function,
+      required: true
+    },
     removeClientBooking: {
       type: Function,
       required: true
@@ -207,6 +220,8 @@ export default {
       waitlistBooking: null,
       waitlistQueue: [],
       waitlistMeta: null,
+      waitlistLoading: false,
+      waitlistError: "",
       cancelFeedback: null,
       cancelFeedbackTimeout: null
     };
@@ -240,6 +255,23 @@ export default {
         this.closeCancelModal();
       }
     },
+    async openWaitlist(booking) {
+      this.waitlistBooking = booking;
+      this.waitlistQueue = [];
+      this.waitlistMeta = null;
+      this.waitlistError = "";
+      this.waitlistLoading = true;
+      this.showWaitlistModal = true;
+      try {
+        const queue = await this.fetchWaitlistQueue(booking);
+        this.waitlistQueue = this.buildWaitlistQueue(booking, queue);
+        this.waitlistMeta = this.buildWaitlistMeta(booking, this.waitlistQueue);
+      } catch (error) {
+        this.waitlistError = error?.message || "Erro ao carregar lista de espera.";
+      } finally {
+        this.waitlistLoading = false;
+      }
+    },
     setCancelFeedback(type, message) {
       this.cancelFeedback = { type, message };
       if (this.cancelFeedbackTimeout) {
@@ -250,23 +282,19 @@ export default {
         this.cancelFeedbackTimeout = null;
       }, 4000);
     },
-    openWaitlist(booking) {
-      this.waitlistBooking = booking;
-      this.waitlistQueue = this.buildWaitlistQueue(booking);
-      this.waitlistMeta = this.buildWaitlistMeta(booking, this.waitlistQueue);
-      this.showWaitlistModal = true;
-    },
     closeWaitlistModal() {
       this.showWaitlistModal = false;
       this.waitlistBooking = null;
       this.waitlistQueue = [];
       this.waitlistMeta = null;
+      this.waitlistError = "";
+      this.waitlistLoading = false;
     },
-    buildWaitlistQueue(booking) {
+    buildWaitlistQueue(booking, queueItems) {
       const targetDate = booking.date || "";
       const targetServiceId = booking.serviceId || "";
       const targetCompanyId = booking.companyId || "";
-      const queue = this.clientBookingsDetailed.filter((item) => {
+      const queue = (queueItems || []).filter((item) => {
         if (targetDate && item.date && item.date !== targetDate) return false;
         if (targetServiceId && item.serviceId && String(item.serviceId) !== String(targetServiceId)) {
           return false;
@@ -315,6 +343,11 @@ export default {
       const hours = Math.floor(totalMinutes / 60);
       const minutes = totalMinutes % 60;
       return minutes ? `${hours}h ${minutes}m` : `${hours}h`;
+    },
+    isTodayBooking(booking) {
+      if (!booking?.date) return false;
+      const today = new Date().toISOString().slice(0, 10);
+      return booking.date === today;
     }
   }
 };
@@ -382,6 +415,13 @@ export default {
   background: #fef2f2;
   color: #b91c1c;
   border: 1px solid #fecaca;
+}
+
+.error {
+  margin: 10px 20px 0;
+  color: #b91c1c;
+  font-weight: 600;
+  text-align: center;
 }
 
 .bookings-list {

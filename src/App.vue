@@ -120,6 +120,7 @@
       :select-service="selectService"
       :book-slot="bookSlot"
       :remove-client-booking="removeClientBooking"
+      :fetch-waitlist-queue="fetchWaitlistQueue"
       :close-slots-modal="closeClientSlotsModal"
       :save-client-profile="saveClientProfile"
       :company-city-label="companyCityLabel"
@@ -155,8 +156,10 @@ import LoginScreen from "./components/LoginScreen.vue";
 import ProfessorPortal from "./components/ProfessorPortal.vue";
 import ClientPortal from "./components/ClientPortal.vue";
 
-const API_BASE = "https://agendamento.rjpasseios.com.br";
-const ASSET_BASE = API_BASE;
+const PROD_API_BASE = "https://agendamento.rjpasseios.com.br";
+const ENV_API_BASE = process.env.VUE_APP_API_BASE;
+const API_BASE = ENV_API_BASE || PROD_API_BASE;
+const ASSET_BASE = ENV_API_BASE || PROD_API_BASE;
 
 const STORAGE = {
   TOKEN: "agenda_token",
@@ -180,7 +183,7 @@ const seedStudents = [
   { id: 3, name: "Pedro Santos", email: "pedro@email.com", phone: "(11) 99999-3333", history: "1 aula" }
 ];
 const seedClientProfile = {
-  nome: "Cliente Demo",
+  nome: "Cliente",
   email: "cliente@email.com",
   telefone: "(11) 98888-0000",
   documento: "000.000.000-00",
@@ -636,13 +639,13 @@ export default {
     } else if (this.clientAuthenticated) {
       this.activePortal = "cliente";
     }
-    this.fetchClientCompanies();
-    if (this.clientAuthenticated) {
-      this.fetchClientBookings();
-    }
-    if (!this.availabilityQuery.serviceId && this.services.length) {
-      this.availabilityQuery.serviceId = this.services[0].id;
-    }
+      this.fetchClientCompanies();
+      if (this.clientAuthenticated) {
+        this.fetchClientProfile();
+      }
+      if (!this.availabilityQuery.serviceId && this.services.length) {
+        this.availabilityQuery.serviceId = this.services[0].id;
+      }
     if (this.isAuthenticated) {
       this.fetchServices();
       this.fetchCategories();
@@ -683,6 +686,9 @@ export default {
       this.showClientSidebar = false;
       if (tab === "slots") {
         this.fetchClientAvailability();
+      }
+      if (tab === "bookings") {
+        this.fetchClientBookings();
       }
     },
     selectCompany(company) {
@@ -794,6 +800,35 @@ export default {
           return false;
         });
     },
+    fetchWaitlistQueue(booking) {
+      const date =
+        booking?.date ||
+        booking?.data_da_aula ||
+        booking?.data ||
+        booking?.data_agendamento ||
+        booking?.data_aula ||
+        "";
+      if (!date) return Promise.resolve([]);
+      const params = new URLSearchParams({
+        data: date,
+        status: "Espera"
+      });
+      return fetch(`${API_BASE}/api/agendamento/dia?${params.toString()}`, {
+        headers: {
+          "Content-Type": "application/json",
+          ...this.clientAuthHeaders()
+        }
+      })
+        .then(async (response) => {
+          const data = await response.json().catch(() => []);
+          if (!response.ok) {
+            throw new Error(data.error || "Erro ao carregar lista de espera.");
+          }
+          const items = Array.isArray(data) ? data : data.agendamentos || data.data || [];
+          return items.map((item) => this.normalizeClientBooking(item));
+        })
+        .catch(() => []);
+    },
     saveClientProfile() {
       this.clientProfileSaved = false;
       saveStorage(STORAGE.CLIENT_PROFILE, this.clientProfile);
@@ -882,11 +917,11 @@ export default {
             this.selectedCompanyId = this.savedClientCompanyId;
             this.clientTab = "services";
           }
-          this.clientLoginForm.email = "";
-          this.clientLoginForm.password = "";
-          this.fetchClientCompanies();
-          this.fetchClientBookings();
-        })
+            this.clientLoginForm.email = "";
+            this.clientLoginForm.password = "";
+            this.fetchClientCompanies();
+            this.fetchClientProfile();
+          })
         .catch((error) => {
           this.clientLoginError = error.message || "Erro ao autenticar.";
         })
@@ -956,6 +991,54 @@ export default {
       if (this.selectedCompany?.professor?.id) return this.selectedCompany.professor.id;
       if (this.selectedCompany?.user_id) return this.selectedCompany.user_id;
       return "";
+    },
+
+    fetchClientProfile() {
+      const token = localStorage.getItem(STORAGE.CLIENT_TOKEN);
+      if (!token) return;
+      const headers = {
+        "Content-Type": "application/json",
+        ...this.clientAuthHeaders()
+      };
+      const parseUser = (data) => data?.user || data?.usuario || data;
+      const applyUser = (user) => {
+        if (!user) return;
+        const updatedProfile = {
+          ...this.clientProfile,
+          nome: user.nome || user.name || this.clientProfile.nome,
+          email: user.email || this.clientProfile.email,
+          telefone: user.telefone || user.phone || this.clientProfile.telefone,
+          documento: user.documento || this.clientProfile.documento,
+          foto: user.foto || user.avatar || this.clientProfile.foto
+        };
+        this.clientProfile = updatedProfile;
+        saveStorage(STORAGE.CLIENT_PROFILE, this.clientProfile);
+      };
+      fetch(API_BASE + "/api/me", { headers })
+        .then(async (response) => {
+          const data = await response.json().catch(() => ({}));
+          if (response.status === 404) {
+            throw new Error("fallback");
+          }
+          if (!response.ok) {
+            throw new Error(data.error || "Erro ao carregar perfil do cliente.");
+          }
+          applyUser(parseUser(data));
+        })
+        .catch((error) => {
+          if (error.message !== "fallback") return;
+          fetch(API_BASE + "/api/user", { headers })
+            .then(async (response) => {
+              const data = await response.json().catch(() => ({}));
+              if (!response.ok) {
+                throw new Error(data.error || "Erro ao carregar perfil do cliente.");
+              }
+              applyUser(parseUser(data));
+            })
+            .catch(() => {
+              // Mantem dados locais se a API falhar.
+            });
+        });
     },
     fetchClientCompanies() {
       this.clientCompaniesLoading = true;
@@ -1071,6 +1154,12 @@ export default {
         booking.servico_nome ||
         booking.serviceName ||
         "";
+      const studentName =
+        booking.aluno?.usuario?.nome ||
+        booking.aluno?.nome ||
+        booking.aluno_nome ||
+        booking.studentName ||
+        "";
       const id =
         booking.id ||
         booking.agendamento_id ||
@@ -1082,6 +1171,7 @@ export default {
         serviceId,
         companyName,
         serviceName,
+        studentName,
         date,
         time,
         status
