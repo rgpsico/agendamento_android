@@ -23,6 +23,17 @@
         class="card clickable"
         @click="selectService(service)"
       >
+        <div class="company-badge">
+          <div class="company-logo">
+            <img
+              v-if="selectedCompany && companyImageUrl && companyImageUrl(selectedCompany)"
+              :src="companyImageUrl(selectedCompany)"
+              :alt="`Logo da empresa ${selectedCompany.nome || 'Empresa'}`"
+            />
+            <span v-else class="company-logo-fallback">Sem logo</span>
+          </div>
+          <span class="company-name">{{ selectedCompany?.nome || "Empresa" }}</span>
+        </div>
         <div class="service-image-wrapper">
           <img
             v-if="service.imagem && serviceImageUrl"
@@ -64,6 +75,10 @@ export default {
     },
     clientServicesForCompany: {
       type: Array,
+      required: true
+    },
+    companyImageUrl: {
+      type: Function,
       required: true
     },
     serviceImageUrl: {
@@ -136,5 +151,43 @@ export default {
   color: var(--muted);
   background: linear-gradient(135deg, #f0f4f8 0%, #e7eef5 100%);
   font-size: 13px;
+}
+
+.company-badge {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.company-logo {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: var(--background);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.company-logo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.company-logo-fallback {
+  font-size: 10px;
+  color: var(--muted);
+}
+
+.company-name {
+  font-weight: 600;
+  color: var(--text);
+  font-size: 14px;
 }
 </style>

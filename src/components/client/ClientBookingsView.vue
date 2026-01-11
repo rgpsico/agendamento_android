@@ -4,7 +4,11 @@
       <h3>📅 Meus Agendamentos</h3>
     </div>
 
-    <div v-if="clientBookingsDetailed.length" class="bookings-container">
+      <p v-if="cancelFeedback" class="feedback" :class="cancelFeedback.type">
+        {{ cancelFeedback.message }}
+      </p>
+
+      <div v-if="clientBookingsDetailed.length" class="bookings-container">
       <p class="bookings-count">
         {{ clientBookingsDetailed.length }} agendamento{{ clientBookingsDetailed.length > 1 ? 's' : '' }}
       </p>
@@ -59,6 +63,15 @@
 
           <!-- Ações -->
           <div class="booking-actions">
+            <button class="waitlist-btn" @click="openWaitlist(booking)">
+              <span class="btn-icon">
+                <svg viewBox="0 0 24 24" class="waitlist-icon" aria-hidden="true">
+                  <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2" />
+                  <path d="M12 7v6l4 2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+                </svg>
+              </span>
+              Lista de espera
+            </button>
             <button 
               class="cancel-btn" 
               @click="confirmCancel(booking)"
@@ -106,6 +119,66 @@
         </div>
       </div>
     </div>
+  
+    <!-- Modal de Lista de Espera -->
+    <div
+      v-if="showWaitlistModal"
+      class="modal-overlay"
+      @click.self="closeWaitlistModal"
+    >
+      <div class="waitlist-modal">
+        <div class="modal-icon">
+          <svg viewBox="0 0 24 24" class="waitlist-icon modal-icon-svg" aria-hidden="true">
+            <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2" />
+            <path d="M12 7v6l4 2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+          </svg>
+        </div>
+        <h4>Lista de espera</h4>
+        <p v-if="waitlistBooking">
+          Agendamentos do dia {{ waitlistBooking.dateLabel || "-" }}
+        </p>
+  
+        <div v-if="waitlistMeta" class="waitlist-summary">
+          <div class="summary-item">
+            <span class="summary-label">Sua posicao</span>
+            <span class="summary-value">#{{ waitlistMeta.position }}</span>
+          </div>
+          <div class="summary-item">
+            <span class="summary-label">Pessoas na sua frente</span>
+            <span class="summary-value">{{ waitlistMeta.peopleAhead }}</span>
+          </div>
+          <div class="summary-item">
+            <span class="summary-label">Tempo estimado</span>
+            <span class="summary-value">{{ formatMinutes(waitlistMeta.estimatedMinutes) }}</span>
+          </div>
+        </div>
+  
+        <div v-if="waitlistQueue.length" class="waitlist-list">
+          <div
+            v-for="(item, index) in waitlistQueue"
+            :key="item.id"
+            class="waitlist-row"
+            :class="{ highlight: waitlistBooking && item.id === waitlistBooking.id }"
+          >
+            <span class="waitlist-position">{{ index + 1 }}</span>
+            <div class="waitlist-info">
+              <span class="waitlist-name">
+                {{ item.id === waitlistBooking?.id ? (clientProfile?.nome || "Voce") : "Pessoa na fila" }}
+              </span>
+              <span class="waitlist-time">{{ item.time || "-" }}</span>
+            </div>
+          </div>
+        </div>
+  
+        <p v-else class="hint">Nenhum agendamento encontrado para o dia.</p>
+  
+        <div class="modal-actions">
+          <button class="modal-btn cancel-close" @click="closeWaitlistModal">
+            Fechar
+          </button>
+        </div>
+      </div>
+    </div>
   </section>
 </template>
 
@@ -117,6 +190,10 @@ export default {
       type: Array,
       required: true
     },
+    clientProfile: {
+      type: Object,
+      required: true
+    },
     removeClientBooking: {
       type: Function,
       required: true
@@ -125,7 +202,13 @@ export default {
   data() {
     return {
       showCancelModal: false,
-      bookingToCancel: null
+      bookingToCancel: null,
+      showWaitlistModal: false,
+      waitlistBooking: null,
+      waitlistQueue: [],
+      waitlistMeta: null,
+      cancelFeedback: null,
+      cancelFeedbackTimeout: null
     };
   },
   methods: {
@@ -147,11 +230,91 @@ export default {
       this.showCancelModal = false;
       this.bookingToCancel = null;
     },
-    executeCancellation() {
+    async executeCancellation() {
       if (this.bookingToCancel) {
-        this.removeClientBooking(this.bookingToCancel.id);
+        const success = await this.removeClientBooking(this.bookingToCancel.id);
+        this.setCancelFeedback(
+          success ? "success" : "error",
+          success ? "Cancelado com sucesso." : "Erro ao cancelar agendamento."
+        );
         this.closeCancelModal();
       }
+    },
+    setCancelFeedback(type, message) {
+      this.cancelFeedback = { type, message };
+      if (this.cancelFeedbackTimeout) {
+        clearTimeout(this.cancelFeedbackTimeout);
+      }
+      this.cancelFeedbackTimeout = setTimeout(() => {
+        this.cancelFeedback = null;
+        this.cancelFeedbackTimeout = null;
+      }, 4000);
+    },
+    openWaitlist(booking) {
+      this.waitlistBooking = booking;
+      this.waitlistQueue = this.buildWaitlistQueue(booking);
+      this.waitlistMeta = this.buildWaitlistMeta(booking, this.waitlistQueue);
+      this.showWaitlistModal = true;
+    },
+    closeWaitlistModal() {
+      this.showWaitlistModal = false;
+      this.waitlistBooking = null;
+      this.waitlistQueue = [];
+      this.waitlistMeta = null;
+    },
+    buildWaitlistQueue(booking) {
+      const targetDate = booking.date || "";
+      const targetServiceId = booking.serviceId || "";
+      const targetCompanyId = booking.companyId || "";
+      const queue = this.clientBookingsDetailed.filter((item) => {
+        if (targetDate && item.date && item.date !== targetDate) return false;
+        if (targetServiceId && item.serviceId && String(item.serviceId) !== String(targetServiceId)) {
+          return false;
+        }
+        if (targetCompanyId && item.companyId && String(item.companyId) !== String(targetCompanyId)) {
+          return false;
+        }
+        return true;
+      });
+      return queue
+        .map((item) => ({
+          ...item,
+          _timeValue: this.timeToMinutes(item.time)
+        }))
+        .sort((a, b) => a._timeValue - b._timeValue);
+    },
+    buildWaitlistMeta(booking, queue) {
+      const positionIndex = queue.findIndex((item) => item.id === booking.id);
+      const position = positionIndex >= 0 ? positionIndex + 1 : queue.length + 1;
+      const peopleAhead = positionIndex >= 0 ? positionIndex : queue.length;
+      const duration = this.getBookingDuration(booking);
+      const estimatedMinutes = Math.max(peopleAhead * duration, 0);
+      return { position, peopleAhead, estimatedMinutes };
+    },
+    getBookingDuration(booking) {
+      const raw =
+        booking.serviceDuration ||
+        booking.tempo_de_aula ||
+        booking.duracao ||
+        20;
+      const duration = Number(raw);
+      return Number.isFinite(duration) && duration > 0 ? duration : 20;
+    },
+    timeToMinutes(time) {
+      if (!time || typeof time !== "string") return 9999;
+      const parts = time.split(":");
+      if (parts.length < 2) return 9999;
+      const hours = Number(parts[0]);
+      const minutes = Number(parts[1]);
+      if (!Number.isFinite(hours) || !Number.isFinite(minutes)) return 9999;
+      return hours * 60 + minutes;
+    },
+    formatMinutes(totalMinutes) {
+      if (!Number.isFinite(totalMinutes)) return "-";
+      if (totalMinutes < 60) return `${totalMinutes} min`;
+      const hours = Math.floor(totalMinutes / 60);
+      const minutes = totalMinutes % 60;
+      return minutes ? `${hours}h ${minutes}m` : `${hours}h`;
     }
   }
 };
@@ -198,6 +361,27 @@ export default {
   font-weight: 600;
   color: #6b7280;
   text-align: center;
+}
+
+.feedback {
+  margin: 12px 20px 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  text-align: center;
+}
+
+.feedback.success {
+  background: #ecfdf3;
+  color: #047857;
+  border: 1px solid #a7f3d0;
+}
+
+.feedback.error {
+  background: #fef2f2;
+  color: #b91c1c;
+  border: 1px solid #fecaca;
 }
 
 .bookings-list {
@@ -341,6 +525,32 @@ export default {
 .booking-actions {
   padding: 12px 16px 16px;
   border-top: 1px solid #f3f4f6;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.waitlist-btn {
+  width: 100%;
+  padding: 12px;
+  background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+  border: 2px solid #bfdbfe;
+  border-radius: 10px;
+  color: #1d4ed8;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: all 0.2s ease;
+}
+
+.waitlist-btn:active {
+  transform: scale(0.98);
+  background: #dbeafe;
+  border-color: #93c5fd;
 }
 
 .cancel-btn {
@@ -368,6 +578,17 @@ export default {
 
 .btn-icon {
   font-size: 16px;
+}
+
+.waitlist-icon {
+  width: 16px;
+  height: 16px;
+  display: block;
+}
+
+.modal-icon-svg {
+  width: 56px;
+  height: 56px;
 }
 
 /* Empty State */
@@ -502,6 +723,102 @@ export default {
   gap: 10px;
 }
 
+.waitlist-modal {
+  background: white;
+  border-radius: 20px;
+  padding: 28px 24px 24px;
+  max-width: 420px;
+  width: 100%;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  animation: scaleIn 0.3s cubic-bezier(0.32, 0.72, 0, 1);
+  text-align: center;
+}
+
+.waitlist-summary {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin: 20px 0;
+}
+
+.summary-item {
+  background: #f3f4f6;
+  border-radius: 12px;
+  padding: 12px 8px;
+}
+
+.summary-label {
+  display: block;
+  font-size: 11px;
+  font-weight: 700;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.summary-value {
+  display: block;
+  font-size: 16px;
+  font-weight: 800;
+  color: #111827;
+  margin-top: 6px;
+}
+
+.waitlist-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: 280px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.waitlist-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  text-align: left;
+}
+
+.waitlist-row.highlight {
+  border-color: #60a5fa;
+  background: #eff6ff;
+}
+
+.waitlist-position {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: #e5e7eb;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 12px;
+  color: #374151;
+}
+
+.waitlist-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.waitlist-name {
+  font-size: 14px;
+  font-weight: 700;
+  color: #111827;
+}
+
+.waitlist-time {
+  font-size: 12px;
+  color: #6b7280;
+}
+
 .modal-btn {
   width: 100%;
   padding: 14px;
@@ -552,6 +869,11 @@ export default {
     border-color: #dc2626;
   }
 
+  .waitlist-btn:hover {
+    background: #dbeafe;
+    border-color: #60a5fa;
+  }
+
   .modal-btn:hover {
     opacity: 0.9;
   }
@@ -571,6 +893,7 @@ export default {
 @media (prefers-reduced-motion: reduce) {
   .modal-overlay,
   .cancel-modal,
+  .waitlist-modal,
   .booking-card {
     animation: none;
   }

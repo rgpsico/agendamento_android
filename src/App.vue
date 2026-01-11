@@ -535,22 +535,29 @@ export default {
       });
     },
     clientBookingsDetailed() {
-      return this.clientBookings.map((booking) => {
-        const company =
-          this.clientCompanies.find((item) => item.id === booking.companyId) || {};
-        const service =
-          this.clientServices.find((item) => item.id === booking.serviceId) || {};
-        const companyName = company.nome || booking.companyName || "Empresa";
-        const serviceName =
-          service.titulo || service.nome || booking.serviceName || "Servico";
-        return {
-          ...booking,
-          companyName,
-          serviceName,
-          dateLabel: formatDateLabel(booking.date)
-        };
-      });
-    },
+        return this.clientBookings.map((booking) => {
+          const company =
+            this.clientCompanies.find((item) => item.id === booking.companyId) || {};
+          const service =
+            this.clientServices.find((item) => item.id === booking.serviceId) || {};
+          const companyName = company.nome || booking.companyName || "Empresa";
+          const serviceName =
+            service.titulo || service.nome || booking.serviceName || "Servico";
+          const serviceDuration =
+            service.tempo_de_aula ||
+            service.duracao ||
+            booking.serviceDuration ||
+            booking.duracao ||
+            "";
+          return {
+            ...booking,
+            companyName,
+            serviceName,
+            serviceDuration,
+            dateLabel: formatDateLabel(booking.date)
+          };
+        });
+      },
     filteredAppointments() {
       return this.appointmentsDetailed.filter((appt) => {
         const matchesStart = this.appointmentsFilter.start
@@ -766,7 +773,7 @@ export default {
       saveStorage(STORAGE.CLIENT_BOOKINGS, this.clientBookings);
     },
     removeClientBooking(id) {
-      fetch(`${API_BASE}/api/agendamento/destroy/${id}`, {
+      return fetch(`${API_BASE}/api/agendamento/destroy/${id}`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -780,9 +787,11 @@ export default {
           }
           this.clientBookings = this.clientBookings.filter((booking) => booking.id !== id);
           saveStorage(STORAGE.CLIENT_BOOKINGS, this.clientBookings);
+          return true;
         })
         .catch(() => {
           // Mantem dados locais se a API falhar.
+          return false;
         });
     },
     saveClientProfile() {

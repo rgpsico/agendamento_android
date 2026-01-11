@@ -29,6 +29,7 @@
           :selected-company="selectedCompany"
           :client-services-for-company="clientServicesForCompany"
           :service-image-url="serviceImageUrl"
+          :company-image-url="companyImageUrl"
           :select-service="selectService"
           :go-to-client-tab="goToClientTab"
           :is-company-saved="isClientCompanySaved"
@@ -38,6 +39,7 @@
         <ClientBookingsView
           v-if="clientTab === 'bookings'"
           :client-bookings-detailed="clientBookingsDetailed"
+          :client-profile="clientProfile"
           :remove-client-booking="removeClientBooking"
         />
 
