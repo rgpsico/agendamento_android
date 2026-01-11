@@ -111,6 +111,7 @@
       :client-profile-saved="clientProfileSaved"
       :show-slots-modal="clientSlotsModalOpen"
       :is-client-company-saved="isSelectedCompanySaved"
+      :go-to-saved-company="goToSavedCompany"
       :toggle-client-sidebar="toggleClientSidebar"
       :close-client-sidebar="closeClientSidebar"
       :go-to-client-tab="goToClientTab"
@@ -690,6 +691,14 @@ export default {
       if (tab === "bookings") {
         this.fetchClientBookings();
       }
+    },
+    goToSavedCompany() {
+      if (!this.savedClientCompanyId) return;
+      this.selectedCompanyId = this.savedClientCompanyId;
+      this.selectedServiceId = "";
+      this.fetchClientServices(this.savedClientCompanyId);
+      this.clientTab = "services";
+      this.showClientSidebar = false;
     },
     selectCompany(company) {
       this.selectedCompanyId = company.id;

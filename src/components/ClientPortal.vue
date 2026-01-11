@@ -7,6 +7,9 @@
           <p class="label">Cliente</p>
           <h2>{{ clientProfile.nome || "Cliente" }}</h2>
         </div>
+        <button class="secondary-btn" :disabled="!isClientCompanySaved" @click="goToSavedCompany">
+          Minha empresa
+        </button>
         <button class="secondary-btn" @click="clientLogout">Logout</button>
       </header>
 
@@ -229,6 +232,10 @@ export default {
     },
     isClientCompanySaved: {
       type: Boolean,
+      required: true
+    },
+    goToSavedCompany: {
+      type: Function,
       required: true
     },
     showSlotsModal: {
