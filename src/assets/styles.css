@@ -465,7 +465,24 @@ body {
 }
 
 .bottom-nav.professor-nav {
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(6, 1fr);
+}
+
+.log-box {
+  max-height: 220px;
+  overflow-y: auto;
+  background: #f6f8fc;
+  border-radius: 12px;
+  padding: 12px;
+  border: 1px solid var(--border);
+}
+
+.log-box pre {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text);
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 
 .bottom-nav-btn {
