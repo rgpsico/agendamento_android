@@ -1,33 +1,8 @@
 <template>
-  <div class="app-layout">
-    <div v-if="showSidebar" class="sidebar-backdrop" @click="closeSidebar"></div>
-    <aside class="sidebar" :class="{ open: showSidebar }">
-      <div class="sidebar-header">
-        <h1>Agenda Pro</h1>
-        <p class="subtitle">Menu Principal</p>
-      </div>
-      <nav class="sidebar-nav">
-        <button :class="{ active: currentTab === 'dashboard' }" @click="goToTab('dashboard')">
-          Dashboard
-        </button>
-        <button :class="{ active: currentTab === 'appointments' }" @click="goToTab('appointments')">
-          Agendamentos
-        </button>
-        <button :class="{ active: currentTab === 'services' }" @click="goToTab('services')">
-          Servicos
-        </button>
-        <button :class="{ active: currentTab === 'students' }" @click="goToTab('students')">
-          Alunos
-        </button>
-        <button :class="{ active: currentTab === 'availability' }" @click="goToTab('availability')">
-          Horarios
-        </button>
-      </nav>
-    </aside>
-
+  <div class="app-layout professor-layout">
     <div class="app-main">
       <header class="topbar">
-        <button class="icon-btn" @click="toggleSidebar">Menu</button>
+        <div class="topbar-spacer"></div>
         <div class="topbar-info">
           <p class="label">Professor</p>
           <h2>{{ teacher.name }}</h2>
@@ -36,426 +11,185 @@
       </header>
 
       <main class="content">
-        <section v-if="currentTab === 'dashboard'" class="view">
-          <h3>Dashboard</h3>
-          <div class="filter-row">
-            <label class="field small">
-              <span>Data Inicio</span>
-              <input type="date" :value="dashboardStart" @input="setDashboardStart($event.target.value)" />
-            </label>
-            <label class="field small">
-              <span>Data Final</span>
-              <input type="date" :value="dashboardEnd" @input="setDashboardEnd($event.target.value)" />
-            </label>
-            <button class="primary-btn" @click="applyDashboardFilter">Filtrar</button>
-          </div>
+        <ProfessorDashboardView
+          v-if="currentTab === 'dashboard'"
+          :dashboard-start="dashboardStart"
+          :dashboard-end="dashboardEnd"
+          :day-appointments="dayAppointments"
+          :active-day-label="activeDayLabel"
+          :month-appointments="monthAppointments"
+          :active-month-label="activeMonthLabel"
+          :grouped-by-date="groupedByDate"
+          :set-dashboard-start="setDashboardStart"
+          :set-dashboard-end="setDashboardEnd"
+          :apply-dashboard-filter="applyDashboardFilter"
+          :open-day-schedule="openDaySchedule"
+        />
 
-          <div class="cards">
-            <div class="card clickable" @click="openDaySchedule">
-              <p class="card-title">Agendamentos do Dia</p>
-              <p class="card-value">{{ dayAppointments.length }}</p>
-              <p class="card-subtitle">{{ activeDayLabel }}</p>
-            </div>
-            <div class="card">
-              <p class="card-title">Numero de Agendamentos no Mes</p>
-              <p class="card-value">{{ monthAppointments.length }}</p>
-              <p class="card-subtitle">{{ activeMonthLabel }}</p>
-            </div>
-            <div class="card">
-              <p class="card-title">Agendamentos por Periodo</p>
-              <div class="mini-chart">
-                <div v-for="item in groupedByDate" :key="item.date" class="chart-row">
-                  <span>{{ item.label }}</span>
-                  <div class="bar">
-                    <span :style="{ width: item.count * 12 + 'px' }"></span>
-                  </div>
-                  <strong>{{ item.count }}</strong>
-                </div>
-                <p v-if="!groupedByDate.length" class="hint">Sem dados no periodo.</p>
-              </div>
-            </div>
-          </div>
-        </section>
+        <ProfessorDayScheduleView
+          v-if="currentTab === 'daySchedule'"
+          :active-day-label="activeDayLabel"
+          :day-appointments="dayAppointments"
+          :go-to-tab="goToTab"
+        />
 
-        <section v-if="currentTab === 'daySchedule'" class="view">
-          <div class="view-header">
-            <h3>Agendamentos do Dia</h3>
-            <button class="text-btn" @click="goToTab('dashboard')">Voltar</button>
-          </div>
-          <p class="subtitle">{{ activeDayLabel }}</p>
-          <div v-if="dayAppointments.length" class="list">
-            <div v-for="appt in dayAppointments" :key="appt.id" class="list-item">
-              <div>
-                <strong>{{ appt.time }}</strong>
-                <p>{{ appt.studentName }} Жњ {{ appt.serviceName }}</p>
-              </div>
-              <span class="status" :class="appt.status">{{ appt.status }}</span>
-            </div>
-          </div>
-          <p v-else class="hint">Nenhum agendamento encontrado.</p>
-        </section>
+        <ProfessorAppointmentsView
+          v-if="currentTab === 'appointments'"
+          :appointments-loading="appointmentsLoading"
+          :appointments-error="appointmentsError"
+          :appointments-filter="appointmentsFilter"
+          :filtered-appointments="filteredAppointments"
+          :appointment-modal-open="appointmentModalOpen"
+          :appointment-form="appointmentForm"
+          :students="students"
+          :services="services"
+          :start-new-appointment="startNewAppointment"
+          :edit-appointment="editAppointment"
+          :cancel-appointment="cancelAppointment"
+          :close-appointment-modal="closeAppointmentModal"
+          :save-appointment="saveAppointment"
+          :reset-appointment-form="resetAppointmentForm"
+        />
 
-        <section v-if="currentTab === 'appointments'" class="view">
-          <div class="view-header">
-            <h3>Agendamentos</h3>
-            <button class="primary-btn" @click="startNewAppointment">Novo</button>
-          </div>
-          <p v-if="appointmentsLoading" class="hint">Carregando agendamentos...</p>
-          <p v-if="appointmentsError" class="error">{{ appointmentsError }}</p>
-          <div class="filter-row">
-            <label class="field small">
-              <span>Data Inicio</span>
-              <input type="date" v-model="appointmentsFilter.start" />
-            </label>
-            <label class="field small">
-              <span>Data Fim</span>
-              <input type="date" v-model="appointmentsFilter.end" />
-            </label>
-            <label class="field small">
-              <span>Status</span>
-              <select v-model="appointmentsFilter.status">
-                <option value="">Todos</option>
-                <option value="confirmado">Confirmado</option>
-                <option value="pendente">Pendente</option>
-                <option value="cancelado">Cancelado</option>
-              </select>
-            </label>
-          </div>
-          <div class="table-wrap" v-if="filteredAppointments.length">
-            <table class="data-table">
-              <thead>
-                <tr>
-                  <th>Data</th>
-                  <th>Hora</th>
-                  <th>Aluno</th>
-                  <th>Servico</th>
-                  <th>Status</th>
-                  <th>Acoes</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="appt in filteredAppointments" :key="appt.id">
-                  <td>{{ appt.date }}</td>
-                  <td>{{ appt.time }}</td>
-                  <td>{{ appt.studentName }}</td>
-                  <td>{{ appt.serviceName }}</td>
-                  <td>
-                    <span class="status" :class="appt.status">{{ appt.status }}</span>
-                  </td>
-                  <td>
-                    <div class="actions">
-                      <button class="text-btn" @click="editAppointment(appt)">Editar</button>
-                      <button class="text-btn danger" @click="cancelAppointment(appt.id)">Cancelar</button>
-                    </div>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-          <p v-if="!filteredAppointments.length" class="hint">Nenhum agendamento encontrado.</p>
-        </section>
+        <ProfessorServicesView
+          v-if="currentTab === 'services'"
+          :services-loading="servicesLoading"
+          :services-error="servicesError"
+          :services="services"
+          :service-modal-open="serviceModalOpen"
+          :service-form="serviceForm"
+          :categories-loading="categoriesLoading"
+          :categories-error="categoriesError"
+          :categories="categories"
+          :start-new-service="startNewService"
+          :edit-service="editService"
+          :remove-service="removeService"
+          :close-service-modal="closeServiceModal"
+          :save-service="saveService"
+          :reset-service-form="resetServiceForm"
+          :on-service-image-change="onServiceImageChange"
+          :service-image-url="serviceImageUrl"
+        />
 
-        <div v-if="appointmentModalOpen" class="modal-overlay" @click.self="closeAppointmentModal">
-          <div class="modal-card">
-            <div class="view-header">
-              <h4>{{ appointmentForm.id ? "Editar Agendamento" : "Novo Agendamento" }}</h4>
-              <button class="text-btn" @click="closeAppointmentModal">Fechar</button>
-            </div>
-            <div class="form-grid">
-              <label class="field">
-                <span>Data</span>
-                <input type="date" v-model="appointmentForm.date" />
-              </label>
-              <label class="field">
-                <span>Hora</span>
-                <input type="time" v-model="appointmentForm.time" />
-              </label>
-              <label class="field">
-                <span>Aluno</span>
-                <select v-model="appointmentForm.studentId">
-                  <option disabled value="">Selecione</option>
-                  <option v-for="student in students" :key="student.id" :value="student.id">
-                    {{ student.name }}
-                  </option>
-                </select>
-              </label>
-              <label class="field">
-                <span>Servico</span>
-                <select v-model="appointmentForm.serviceId">
-                  <option disabled value="">Selecione</option>
-                  <option v-for="service in services" :key="service.id" :value="service.id">
-                    {{ service.titulo || service.name }}
-                  </option>
-                </select>
-              </label>
-              <label class="field">
-                <span>Status</span>
-                <select v-model="appointmentForm.status">
-                  <option value="confirmado">Confirmado</option>
-                  <option value="pendente">Pendente</option>
-                  <option value="cancelado">Cancelado</option>
-                </select>
-              </label>
-            </div>
-            <div class="actions">
-              <button class="primary-btn" @click="saveAppointment">Salvar</button>
-              <button class="text-btn" @click="resetAppointmentForm">Limpar</button>
-            </div>
-          </div>
-        </div>
+        <ProfessorStudentsView
+          v-if="currentTab === 'students'"
+          :students-loading="studentsLoading"
+          :students-error="studentsError"
+          :students-detailed="studentsDetailed"
+          :student-modal-open="studentModalOpen"
+          :student-form="studentForm"
+          :start-new-student="startNewStudent"
+          :edit-student="editStudent"
+          :remove-student="removeStudent"
+          :close-student-modal="closeStudentModal"
+          :save-student="saveStudent"
+          :reset-student-form="resetStudentForm"
+        />
 
-        <section v-if="currentTab === 'services'" class="view">
-          <div class="view-header">
-            <h3>Servicos</h3>
-            <button class="primary-btn" @click="startNewService">Novo</button>
-          </div>
-          <p v-if="servicesLoading" class="hint">Carregando servicos...</p>
-          <p v-if="servicesError" class="error">{{ servicesError }}</p>
-          <div class="table-wrap" v-if="services.length">
-            <table class="data-table">
-              <thead>
-                <tr>
-                  <th>Titulo</th>
-                  <th>Descricao</th>
-                  <th>Preco</th>
-                  <th>Tempo</th>
-                  <th>Tipo</th>
-                  <th>Categoria</th>
-                  <th>Imagem</th>
-                  <th>Acoes</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="service in services" :key="service.id">
-                  <td>{{ service.titulo || "Servico" }}</td>
-                  <td>{{ service.descricao }}</td>
-                  <td>R$ {{ service.preco }}</td>
-                  <td>{{ service.tempo_de_aula }} min</td>
-                  <td>{{ service.tipo_agendamento }}</td>
-                  <td>{{ service.categoria_id || "-" }}</td>
-                  <td>
-                    <img
-                      v-if="service.imagem"
-                      class="service-thumb"
-                      :src="serviceImageUrl(service.imagem)"
-                      alt="Imagem do servico"
-                    />
-                    <span v-else>-</span>
-                  </td>
-                  <td>
-                    <div class="actions">
-                      <button class="text-btn" @click="editService(service)">Editar</button>
-                      <button class="text-btn danger" @click="removeService(service.id)">Excluir</button>
-                    </div>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-          <p v-if="!services.length && !servicesLoading" class="hint">Nenhum servico encontrado.</p>
-        </section>
-
-        <div v-if="serviceModalOpen" class="modal-overlay" @click.self="closeServiceModal">
-          <div class="modal-card">
-            <div class="view-header">
-              <h4>{{ serviceForm.id ? "Editar Servico" : "Novo Servico" }}</h4>
-              <button class="text-btn" @click="closeServiceModal">Fechar</button>
-            </div>
-            <p v-if="categoriesLoading" class="hint">Carregando categorias...</p>
-            <p v-if="categoriesError" class="error">{{ categoriesError }}</p>
-            <div class="form-grid">
-              <label class="field">
-                <span>Titulo</span>
-                <input type="text" v-model.trim="serviceForm.titulo" />
-              </label>
-              <label class="field">
-                <span>Descricao</span>
-                <input type="text" v-model.trim="serviceForm.descricao" />
-              </label>
-              <label class="field">
-                <span>Preco (R$)</span>
-                <input type="number" v-model.number="serviceForm.preco" />
-              </label>
-              <label class="field">
-                <span>Tempo de Aula (min)</span>
-                <input type="number" v-model.number="serviceForm.tempo_de_aula" />
-              </label>
-              <label class="field">
-                <span>Tipo de Agendamento</span>
-                <select v-model="serviceForm.tipo_agendamento">
-                  <option value="HORARIO">HORARIO</option>
-                  <option value="DIA">DIA</option>
-                </select>
-              </label>
-              <label v-if="serviceForm.tipo_agendamento === 'DIA'" class="field">
-                <span>Vagas por dia</span>
-                <input type="number" v-model.number="serviceForm.vagas" min="1" />
-              </label>
-              <label class="field">
-                <span>Categoria ID</span>
-                <select v-model.number="serviceForm.categoria_id">
-                  <option :value="''">Selecione</option>
-                  <option v-for="cat in categories" :key="cat.id" :value="cat.id">
-                    {{ cat.nome || cat.id }}
-                  </option>
-                </select>
-              </label>
-              <label class="field">
-                <span>Imagem (URL)</span>
-                <input type="file" accept="image/*" @change="onServiceImageChange" />
-                <small class="hint">PNG/JPG ate 2MB.</small>
-              </label>
-            </div>
-            <div class="actions">
-              <button class="primary-btn" @click="saveService">Salvar</button>
-              <button class="text-btn" @click="resetServiceForm">Limpar</button>
-            </div>
-          </div>
-        </div>
-
-        <section v-if="currentTab === 'students'" class="view">
-          <div class="view-header">
-            <h3>Alunos</h3>
-            <button class="primary-btn" @click="startNewStudent">Novo</button>
-          </div>
-          <p v-if="studentsLoading" class="hint">Carregando alunos...</p>
-          <p v-if="studentsError" class="error">{{ studentsError }}</p>
-          <div class="table-wrap" v-if="studentsDetailed.length">
-            <table class="data-table">
-              <thead>
-                <tr>
-                  <th>Nome</th>
-                  <th>Email</th>
-                  <th>Telefone</th>
-                  <th>Data Nascimento</th>
-                  <th>Acoes</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="student in studentsDetailed" :key="student.id">
-                  <td>{{ student.nome }}</td>
-                  <td>{{ student.email }}</td>
-                  <td>{{ student.telefone }}</td>
-                  <td>{{ student.data_nascimento }}</td>
-                  <td>
-                    <div class="actions">
-                      <button class="text-btn" @click="editStudent(student)">Editar</button>
-                      <button class="text-btn danger" @click="removeStudent(student.id)">Excluir</button>
-                    </div>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-          <p v-if="!studentsDetailed.length" class="hint">Nenhum aluno encontrado.</p>
-        </section>
-
-        <div v-if="studentModalOpen" class="modal-overlay" @click.self="closeStudentModal">
-          <div class="modal-card">
-            <div class="view-header">
-              <h4>{{ studentForm.id ? "Editar Aluno" : "Novo Aluno" }}</h4>
-              <button class="text-btn" @click="closeStudentModal">Fechar</button>
-            </div>
-            <div class="form-grid">
-              <label class="field">
-                <span>Primeiro Nome</span>
-                <input type="text" v-model.trim="studentForm.primeiro_nome" />
-              </label>
-              <label class="field">
-                <span>Ultimo Nome</span>
-                <input type="text" v-model.trim="studentForm.ultimo_nome" />
-              </label>
-              <label class="field">
-                <span>Email</span>
-                <input type="email" v-model.trim="studentForm.email" />
-              </label>
-              <label class="field">
-                <span>Telefone</span>
-                <input type="text" v-model.trim="studentForm.telefone" />
-              </label>
-              <label class="field">
-                <span>Data de Nascimento</span>
-                <input type="date" v-model="studentForm.data_nascimento" />
-              </label>
-              <label v-if="!studentForm.id" class="field">
-                <span>Senha</span>
-                <input type="password" v-model.trim="studentForm.password" />
-              </label>
-            </div>
-            <div class="actions">
-              <button class="primary-btn" @click="saveStudent">Salvar</button>
-              <button class="text-btn" @click="resetStudentForm">Limpar</button>
-            </div>
-          </div>
-        </div>
-
-        <section v-if="currentTab === 'availability'" class="view">
-          <div class="view-header">
-            <h3>Disponibilidade</h3>
-            <button class="primary-btn" @click="fetchAvailability">Buscar</button>
-          </div>
-          <div class="filter-row">
-            <label class="field small">
-              <span>Data</span>
-              <input type="date" v-model="availabilityQuery.date" />
-            </label>
-            <label class="field small">
-              <span>Servico</span>
-              <select v-model="availabilityQuery.serviceId">
-                <option disabled value="">Selecione</option>
-                <option v-for="service in services" :key="service.id" :value="service.id">
-                  {{ service.titulo || service.name || "Servico" }}
-                </option>
-              </select>
-            </label>
-            <label class="field small">
-              <span>Dia da semana</span>
-              <input type="text" :value="availabilityDayLabel" disabled />
-            </label>
-            <label class="field small">
-              <span>Mostrar</span>
-              <select :value="availabilityMode" @change="setAvailabilityMode($event.target.value)">
-                <option value="available">Disponiveis</option>
-                <option value="booked">Contratados</option>
-                <option value="all">Todos</option>
-              </select>
-            </label>
-          </div>
-          <p v-if="availabilityLoading" class="hint">Carregando disponibilidade...</p>
-          <p v-if="availabilityError" class="error">{{ availabilityError }}</p>
-          <div v-if="availabilityMode !== 'booked' && availabilitySlots.length" class="list">
-            <div v-for="slot in availabilitySlots" :key="slot" class="list-item">
-              <div>
-                <strong>{{ slot }}</strong>
-                <p>Disponivel</p>
-              </div>
-            </div>
-          </div>
-          <p v-if="contractedLoading" class="hint">Carregando horarios contratados...</p>
-          <p v-if="contractedError" class="error">{{ contractedError }}</p>
-          <div v-if="availabilityMode !== 'available' && contractedSlots.length" class="list">
-            <div v-for="slot in contractedSlots" :key="slot.key" class="list-item">
-              <div>
-                <strong>{{ slot.time }}</strong>
-                <p>{{ slot.label }}</p>
-              </div>
-            </div>
-          </div>
-          <p v-else-if="availabilityMode === 'available' && !availabilityLoading" class="hint">
-            Nenhum horario disponivel.
-          </p>
-          <p v-else-if="availabilityMode === 'booked' && !contractedLoading" class="hint">
-            Nenhum horario contratado.
-          </p>
-        </section>
+        <ProfessorAvailabilityView
+          v-if="currentTab === 'availability'"
+          :availability-query="availabilityQuery"
+          :availability-day-label="availabilityDayLabel"
+          :availability-mode="availabilityMode"
+          :availability-loading="availabilityLoading"
+          :availability-error="availabilityError"
+          :availability-slots="availabilitySlots"
+          :contracted-loading="contractedLoading"
+          :contracted-error="contractedError"
+          :contracted-slots="contractedSlots"
+          :services="services"
+          :fetch-availability="fetchAvailability"
+          :set-availability-mode="setAvailabilityMode"
+        />
       </main>
     </div>
+
+    <nav class="bottom-nav professor-nav" aria-label="Menu principal">
+      <button
+        class="bottom-nav-btn"
+        :class="{ active: currentTab === 'dashboard' }"
+        @click="goToTab('dashboard')"
+      >
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <rect x="3" y="3" width="8" height="8" rx="2" fill="none" stroke="currentColor" stroke-width="2"></rect>
+          <rect x="13" y="3" width="8" height="5" rx="2" fill="none" stroke="currentColor" stroke-width="2"></rect>
+          <rect x="13" y="10" width="8" height="11" rx="2" fill="none" stroke="currentColor" stroke-width="2"></rect>
+          <rect x="3" y="13" width="8" height="8" rx="2" fill="none" stroke="currentColor" stroke-width="2"></rect>
+        </svg>
+        <span>Dashboard</span>
+      </button>
+      <button
+        class="bottom-nav-btn"
+        :class="{ active: currentTab === 'appointments' }"
+        @click="goToTab('appointments')"
+      >
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <rect x="3" y="5" width="18" height="16" rx="2" ry="2" fill="none" stroke="currentColor" stroke-width="2"></rect>
+          <line x1="16" y1="3" x2="16" y2="7" stroke="currentColor" stroke-width="2"></line>
+          <line x1="8" y1="3" x2="8" y2="7" stroke="currentColor" stroke-width="2"></line>
+          <line x1="3" y1="11" x2="21" y2="11" stroke="currentColor" stroke-width="2"></line>
+        </svg>
+        <span>Agendas</span>
+      </button>
+      <button
+        class="bottom-nav-btn"
+        :class="{ active: currentTab === 'services' }"
+        @click="goToTab('services')"
+      >
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M4 6h16v4H4z" fill="none" stroke="currentColor" stroke-width="2"></path>
+          <path d="M4 14h10v4H4z" fill="none" stroke="currentColor" stroke-width="2"></path>
+          <path d="M16 14h4v4h-4z" fill="none" stroke="currentColor" stroke-width="2"></path>
+        </svg>
+        <span>Servicos</span>
+      </button>
+      <button
+        class="bottom-nav-btn"
+        :class="{ active: currentTab === 'students' }"
+        @click="goToTab('students')"
+      >
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <circle cx="8" cy="8" r="3" fill="none" stroke="currentColor" stroke-width="2"></circle>
+          <circle cx="16" cy="8" r="3" fill="none" stroke="currentColor" stroke-width="2"></circle>
+          <path d="M2 20c1.5-3 4-4 6-4" fill="none" stroke="currentColor" stroke-width="2"></path>
+          <path d="M16 16c2 0 4.5 1 6 4" fill="none" stroke="currentColor" stroke-width="2"></path>
+          <path d="M9 20c1-2.5 2.5-4 5-4" fill="none" stroke="currentColor" stroke-width="2"></path>
+        </svg>
+        <span>Alunos</span>
+      </button>
+      <button
+        class="bottom-nav-btn"
+        :class="{ active: currentTab === 'availability' }"
+        @click="goToTab('availability')"
+      >
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"></circle>
+          <path d="M12 7v5l3 3" fill="none" stroke="currentColor" stroke-width="2"></path>
+        </svg>
+        <span>Horarios</span>
+      </button>
+    </nav>
   </div>
 </template>
 
 <script>
+import ProfessorDashboardView from "./professor/ProfessorDashboardView.vue";
+import ProfessorDayScheduleView from "./professor/ProfessorDayScheduleView.vue";
+import ProfessorAppointmentsView from "./professor/ProfessorAppointmentsView.vue";
+import ProfessorServicesView from "./professor/ProfessorServicesView.vue";
+import ProfessorStudentsView from "./professor/ProfessorStudentsView.vue";
+import ProfessorAvailabilityView from "./professor/ProfessorAvailabilityView.vue";
+
 export default {
   name: "ProfessorPortal",
+  components: {
+    ProfessorDashboardView,
+    ProfessorDayScheduleView,
+    ProfessorAppointmentsView,
+    ProfessorServicesView,
+    ProfessorStudentsView,
+    ProfessorAvailabilityView
+  },
   props: {
     showSidebar: {
       type: Boolean,

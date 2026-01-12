@@ -151,6 +151,23 @@ body {
   width: 64px;
 }
 
+.professor-layout {
+  flex-direction: column;
+}
+
+.professor-layout .sidebar,
+.professor-layout .sidebar-backdrop {
+  display: none;
+}
+
+.professor-layout .content {
+  padding-bottom: 90px;
+}
+
+.professor-layout .topbar-spacer {
+  width: 64px;
+}
+
 .sidebar {
   width: 240px;
   background: var(--card);
@@ -445,6 +462,10 @@ body {
   grid-template-columns: repeat(3, 1fr);
   align-items: center;
   z-index: 30;
+}
+
+.bottom-nav.professor-nav {
+  grid-template-columns: repeat(5, 1fr);
 }
 
 .bottom-nav-btn {

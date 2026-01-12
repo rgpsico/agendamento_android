@@ -1965,7 +1965,7 @@ export default {
       const requests = [];
       if (shouldLoadAvailable) {
         this.availabilityLoading = true;
-        const availableReq = fetch(`${API_BASE}/disponibilidade?${baseParams.toString()}`, {
+        const availableReq = fetch(`${API_BASE}/api/disponibilidade?${baseParams.toString()}`, {
           headers: {
             "Content-Type": "application/json",
             ...this.authHeaders()
@@ -1996,7 +1996,7 @@ export default {
           servico_id: String(serviceId)
         });
         const bookedReq = fetch(
-          `${API_BASE}/disponibilidade/horarios-contratados?${bookedParams.toString()}`,
+          `${API_BASE}/api/disponibilidade/horarios-contratados?${bookedParams.toString()}`,
           {
             headers: {
               "Content-Type": "application/json",
