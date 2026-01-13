@@ -108,6 +108,25 @@
 </template>
 
 <script>
+const CHAT_STORAGE_KEY = "agenda_student_chats";
+
+function loadChatStorage() {
+  if (typeof window === "undefined") return {};
+  const raw = localStorage.getItem(CHAT_STORAGE_KEY);
+  if (!raw) return {};
+  try {
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === "object" ? parsed : {};
+  } catch (error) {
+    return {};
+  }
+}
+
+function saveChatStorage(payload) {
+  if (typeof window === "undefined") return;
+  localStorage.setItem(CHAT_STORAGE_KEY, JSON.stringify(payload));
+}
+
 export default {
   name: "ProfessorStudentsView",
   props: {
@@ -161,7 +180,7 @@ export default {
       chatModalOpen: false,
       chatStudent: null,
       chatDraft: "",
-      chatMessagesByStudent: {}
+      chatMessagesByStudent: loadChatStorage()
     };
   },
   computed: {
@@ -179,6 +198,7 @@ export default {
       this.chatModalOpen = true;
       if (!this.chatMessagesByStudent[student.id]) {
         this.$set(this.chatMessagesByStudent, student.id, []);
+        saveChatStorage(this.chatMessagesByStudent);
       }
     },
     closeChatModal() {
@@ -197,6 +217,7 @@ export default {
         ...existing,
         { from: "me", text: message, time }
       ];
+      saveChatStorage(this.chatMessagesByStudent);
       this.chatDraft = "";
     }
   }
