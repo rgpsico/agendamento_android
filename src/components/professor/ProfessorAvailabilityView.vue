@@ -6,18 +6,28 @@
         <h3 class="view-title">Disponibilidade de Horários</h3>
         <p class="view-subtitle">Gerencie e visualize os horários disponíveis e contratados</p>
       </div>
-      <button 
-        class="primary-btn" 
-        @click="fetchAvailability"
-        :disabled="!canSearch"
-        :class="{ disabled: !canSearch }"
-      >
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <circle cx="11" cy="11" r="8"></circle>
-          <path d="m21 21-4.35-4.35"></path>
-        </svg>
-        Buscar Horários
-      </button>
+      <div class="view-actions">
+        <button
+          class="secondary-btn add-slot-btn"
+          @click="openAddSlot"
+          :disabled="!canSearch"
+          :class="{ disabled: !canSearch }"
+        >
+          Adicionar horario
+        </button>
+        <button 
+                class="primary-btn" 
+                @click="fetchAvailability"
+                :disabled="!canSearch"
+                :class="{ disabled: !canSearch }"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="11" cy="11" r="8"></circle>
+                  <path d="m21 21-4.35-4.35"></path>
+                </svg>
+                Buscar Horários
+              </button>
+      </div>
     </div>
 
     <!-- Filtros -->
@@ -120,15 +130,15 @@
     <!-- Results -->
     <div v-if="!availabilityLoading && !contractedLoading && !availabilityError && !contractedError">
       <!-- Available Slots -->
-      <div v-if="(availabilityMode === 'available' || availabilityMode === 'all') && availabilitySlots.length" class="slots-section">
+      <div v-if="(availabilityMode === 'available' || availabilityMode === 'all') && availableSlotsToShow.length" class="slots-section">
         <div class="section-header">
           <h4 class="section-title">
             <span class="badge badge-available">Disponíveis</span>
-            {{ availabilitySlots.length }} {{ availabilitySlots.length === 1 ? 'horário' : 'horários' }}
+            {{ availableSlotsToShow.length }} {{ availableSlotsToShow.length === 1 ? 'horário' : 'horários' }}
           </h4>
         </div>
         <div class="slots-grid">
-          <div v-for="slot in availabilitySlots" :key="slot" class="slot-card available">
+          <div v-for="slot in availableSlotsToShow" :key="slot" class="slot-card available">
             <div class="slot-time">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <circle cx="12" cy="12" r="10"></circle>
@@ -179,6 +189,27 @@
         <p class="empty-description">{{ emptyStateDescription }}</p>
       </div>
     </div>
+    <div v-if="addSlotOpen" class="modal-overlay" @click.self="closeAddSlot">
+      <div class="modal-card add-slot-modal">
+        <div class="view-header">
+          <div>
+            <h4>Adicionar horario</h4>
+            <p class="view-subtitle">Data selecionada: {{ availabilityQuery.date || "-" }}</p>
+          </div>
+          <button class="text-btn" @click="closeAddSlot">Fechar</button>
+        </div>
+        <label class="field">
+          <span class="field-label">Horario</span>
+          <input type="time" v-model="newSlotTime" class="field-input" />
+        </label>
+        <p v-if="addSlotError" class="error-message">{{ addSlotError }}</p>
+        <div class="actions">
+          <button class="primary-btn" @click="confirmAddSlot" :disabled="!canSearch">Adicionar</button>
+          <button class="secondary-btn" @click="closeAddSlot">Cancelar</button>
+        </div>
+      </div>
+    </div>
+
   </section>
 </template>
 
@@ -239,19 +270,28 @@ export default {
     canSearch() {
       return this.availabilityQuery.date && this.availabilityQuery.serviceId;
     },
+    availableSlotsToShow() {
+      const combined = [...this.availabilitySlots, ...this.pendingSlots].filter(Boolean);
+      const unique = Array.from(new Set(combined));
+      return unique.sort((a, b) => this.timeToMinutes(a) - this.timeToMinutes(b));
+    },
+    hasAvailableSlots() {
+      return this.availableSlotsToShow.length > 0;
+    },
+    hasBookedSlots() {
+      return this.contractedSlots.length > 0;
+    },
     showEmptyState() {
-      const hasAvailable = this.availabilitySlots.length > 0;
-      const hasBooked = this.contractedSlots.length > 0;
-      
       if (this.availabilityMode === 'available') {
-        return !hasAvailable;
+        return !this.hasAvailableSlots;
       } else if (this.availabilityMode === 'booked') {
-        return !hasBooked;
+        return !this.hasBookedSlots;
       } else if (this.availabilityMode === 'all') {
-        return !hasAvailable && !hasBooked;
+        return !this.hasAvailableSlots && !this.hasBookedSlots;
       }
       return false;
     },
+
     emptyStateTitle() {
       if (this.availabilityMode === 'available') {
         return 'Nenhum horário disponível';
@@ -271,6 +311,69 @@ export default {
       }
       return 'Tente ajustar os filtros de busca.';
     }
+  },
+  data() {
+    return {
+      addSlotOpen: false,
+      newSlotTime: "",
+      addSlotError: "",
+      pendingSlots: []
+    };
+  },
+  watch: {
+    "availabilityQuery.date"() {
+      this.resetPendingSlots();
+    },
+    "availabilityQuery.serviceId"() {
+      this.resetPendingSlots();
+    }
+  },
+  methods: {
+    openAddSlot() {
+      this.addSlotError = "";
+      this.addSlotOpen = true;
+    },
+    closeAddSlot() {
+      this.addSlotOpen = false;
+      this.newSlotTime = "";
+      this.addSlotError = "";
+    },
+    confirmAddSlot() {
+      if (!this.canSearch) {
+        this.addSlotError = "Selecione data e servico primeiro.";
+        return;
+      }
+      const time = this.normalizeTime(this.newSlotTime);
+      if (!time) {
+        this.addSlotError = "Informe um horario valido (HH:MM).";
+        return;
+      }
+      const existing = new Set([...this.availabilitySlots, ...this.pendingSlots]);
+      if (existing.has(time)) {
+        this.addSlotError = "Este horario ja existe na lista.";
+        return;
+      }
+      this.pendingSlots = [...this.pendingSlots, time];
+      this.closeAddSlot();
+    },
+    normalizeTime(value) {
+      if (!value) return "";
+      const match = String(value).match(/^(\d{2}):(\d{2})$/);
+      if (!match) return "";
+      const hours = Number(match[1]);
+      const minutes = Number(match[2]);
+      if (hours > 23 || minutes > 59) return "";
+      return `${match[1]}:${match[2]}`;
+    },
+    timeToMinutes(value) {
+      if (!value) return 0;
+      const match = String(value).match(/^(\d{2}):(\d{2})$/);
+      if (!match) return 0;
+      return Number(match[1]) * 60 + Number(match[2]);
+    },
+    resetPendingSlots() {
+      this.pendingSlots = [];
+    }
   }
 };
 </script>
@@ -289,6 +392,13 @@ export default {
   align-items: flex-start;
   margin-bottom: 24px;
   gap: 16px;
+}
+
+.view-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  justify-content: flex-end;
 }
 
 .view-title {
@@ -330,6 +440,10 @@ export default {
   background: #94a3b8;
   cursor: not-allowed;
   opacity: 0.6;
+}
+
+.add-slot-modal .actions {
+  justify-content: flex-end;
 }
 
 /* Filters */

@@ -1,5 +1,5 @@
 <template>
-  <div class="app-layout professor-layout">
+  <div class="app-layout professor-layout" :class="{ 'theme-dark': isDark }">
     <div class="app-main">
       <header class="topbar">
         <div class="topbar-spacer"></div>
@@ -7,6 +7,9 @@
           <p class="label">Professor</p>
           <h2>{{ teacher.name }}</h2>
         </div>
+        <button class="secondary-btn theme-toggle" @click="toggleTheme">
+          {{ isDark ? "Modo claro" : "Modo escuro" }}
+        </button>
         <button class="secondary-btn" @click="logout">Logout</button>
       </header>
 
@@ -194,6 +197,14 @@ import ProfessorServicesView from "./professor/ProfessorServicesView.vue";
 import ProfessorStudentsView from "./professor/ProfessorStudentsView.vue";
 import ProfessorAvailabilityView from "./professor/ProfessorAvailabilityView.vue";
 import ProfessorCapacitorLabView from "./professor/ProfessorCapacitorLabView.vue";
+
+const THEME_KEY = "agenda_theme";
+const THEMES = { LIGHT: "light", DARK: "dark" };
+
+function loadTheme() {
+  const stored = localStorage.getItem(THEME_KEY);
+  return stored == THEMES.DARK ? THEMES.DARK : THEMES.LIGHT;
+}
 
 export default {
   name: "ProfessorPortal",
@@ -474,6 +485,22 @@ export default {
     setAvailabilityMode: {
       type: Function,
       required: true
+    }
+  },
+  data() {
+    return {
+      theme: loadTheme()
+    };
+  },
+  computed: {
+    isDark() {
+      return this.theme === THEMES.DARK;
+    }
+  },
+  methods: {
+    toggleTheme() {
+      this.theme = this.isDark ? THEMES.LIGHT : THEMES.DARK;
+      localStorage.setItem(THEME_KEY, this.theme);
     }
   }
 };

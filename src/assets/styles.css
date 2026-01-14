@@ -9,6 +9,64 @@
   --border: #dde5f0;
 }
 
+.app-layout.theme-dark {
+  --bg: #0f1724;
+  --card: #121c2b;
+  --primary: #5da0ff;
+  --primary-dark: #3e7ed6;
+  --text: #e6edf6;
+  --muted: #93a4bc;
+  --danger: #ff6b6b;
+  --border: #223146;
+  background: var(--bg);
+  color: var(--text);
+}
+
+.app-layout.theme-dark .secondary-btn {
+  background: #0f1a28;
+  border-color: var(--border);
+  color: var(--text);
+}
+
+.app-layout.theme-dark .sidebar-nav button.active {
+  background: #1a2a3f;
+  border-color: #223a55;
+  color: #cfe0ff;
+}
+
+.app-layout.theme-dark .data-table th {
+  background: #162335;
+}
+
+.app-layout.theme-dark .icon-btn {
+  background: #1a2a3f;
+}
+
+.app-layout.theme-dark .bar {
+  background: #1a2a3f;
+}
+
+.app-layout.theme-dark .chat-box {
+  background: #0f1a28;
+}
+
+.app-layout.theme-dark .chat-message.incoming {
+  background: #121c2b;
+  border-color: var(--border);
+}
+
+.app-layout.theme-dark .log-box {
+  background: #0f1a28;
+}
+
+.app-layout.theme-dark .field input,
+.app-layout.theme-dark .field select,
+.app-layout.theme-dark .chat-input input {
+  background: #0f1a28;
+  border-color: var(--border);
+  color: var(--text);
+}
+
 * {
   box-sizing: border-box;
   font-family: "Poppins", "Segoe UI", sans-serif;
