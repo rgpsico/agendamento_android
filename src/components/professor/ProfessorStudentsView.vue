@@ -86,7 +86,9 @@
         </div>
 
         <div class="chat-box">
-          <p v-if="!chatMessages.length" class="hint">Nenhuma mensagem ainda.</p>
+          <p v-if="chatLoading" class="hint">Carregando conversa...</p>
+          <p v-else-if="chatError" class="error">{{ chatError }}</p>
+          <p v-else-if="!chatMessages.length" class="hint">Nenhuma mensagem ainda.</p>
           <div
             v-for="(msg, index) in chatMessages"
             :key="index"
@@ -108,23 +110,84 @@
 </template>
 
 <script>
-const CHAT_STORAGE_KEY = "agenda_student_chats";
+const PROD_API_BASE = "https://agendamento.rjpasseios.com.br";
+const ENV_API_BASE = process.env.VUE_APP_API_BASE;
+const API_BASE = ENV_API_BASE || PROD_API_BASE;
 
-function loadChatStorage() {
-  if (typeof window === "undefined") return {};
-  const raw = localStorage.getItem(CHAT_STORAGE_KEY);
-  if (!raw) return {};
-  try {
-    const parsed = JSON.parse(raw);
-    return parsed && typeof parsed === "object" ? parsed : {};
-  } catch (error) {
-    return {};
-  }
+const STORAGE = {
+  TOKEN: "agenda_token",
+  EMPRESA: "agenda_empresa_id",
+  PROFESSOR: "agenda_professor_id"
+};
+
+function authHeaders() {
+  const token = localStorage.getItem(STORAGE.TOKEN);
+  return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
-function saveChatStorage(payload) {
-  if (typeof window === "undefined") return;
-  localStorage.setItem(CHAT_STORAGE_KEY, JSON.stringify(payload));
+function resolveEmpresaId() {
+  return localStorage.getItem(STORAGE.EMPRESA) || localStorage.getItem(STORAGE.PROFESSOR) || "";
+}
+
+function resolveProfessorId() {
+  return localStorage.getItem(STORAGE.PROFESSOR) || "";
+}
+
+function normalizeSender(from) {
+  if (!from) return "";
+  const value = String(from).toLowerCase();
+  if (value === "me" || value === "professor" || value === "teacher") return "me";
+  if (value === "aluno" || value === "student" || value === "cliente") return "student";
+  return "";
+}
+
+function formatMessageTime(value) {
+  if (!value) return "";
+  if (typeof value === "string" && /^\d{2}:\d{2}/.test(value)) {
+    return value.slice(0, 5);
+  }
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  const hours = String(date.getHours()).padStart(2, "0");
+  const minutes = String(date.getMinutes()).padStart(2, "0");
+  return `${hours}:${minutes}`;
+}
+
+function extractMessages(payload) {
+  if (!payload) return [];
+  if (Array.isArray(payload)) return payload;
+  if (Array.isArray(payload.messages)) return payload.messages;
+  if (Array.isArray(payload.mensagens)) return payload.mensagens;
+  if (Array.isArray(payload.conversation?.messages)) return payload.conversation.messages;
+  if (Array.isArray(payload.conversation?.mensagens)) return payload.conversation.mensagens;
+  if (Array.isArray(payload.conversa?.mensagens)) return payload.conversa.mensagens;
+  if (Array.isArray(payload.data?.messages)) return payload.data.messages;
+  if (Array.isArray(payload.data?.mensagens)) return payload.data.mensagens;
+  return [];
+}
+
+function normalizeMessages(messages) {
+  const professorId = resolveProfessorId();
+  return messages
+    .map((msg) => {
+      const text = msg.text || msg.mensagem || msg.message || msg.conteudo || "";
+      const time = formatMessageTime(msg.time || msg.hora || msg.created_at || msg.data_hora);
+      const from =
+        normalizeSender(msg.from || msg.remetente || msg.autor) ||
+        (String(
+          msg.user_id ||
+            msg.remetente_id ||
+            msg.sender_id ||
+            msg.usuario_id ||
+            msg.author_id ||
+            ""
+        ) === String(professorId)
+          ? "me"
+          : "student");
+      if (!text) return null;
+      return { from, text, time };
+    })
+    .filter(Boolean);
 }
 
 export default {
@@ -180,7 +243,9 @@ export default {
       chatModalOpen: false,
       chatStudent: null,
       chatDraft: "",
-      chatMessagesByStudent: loadChatStorage()
+      chatMessagesByStudent: {},
+      chatLoading: false,
+      chatError: ""
     };
   },
   computed: {
@@ -196,14 +261,51 @@ export default {
     openChat(student) {
       this.chatStudent = student;
       this.chatModalOpen = true;
-      if (!this.chatMessagesByStudent[student.id]) {
-        this.$set(this.chatMessagesByStudent, student.id, []);
-        saveChatStorage(this.chatMessagesByStudent);
-      }
+      this.chatError = "";
+      this.fetchConversation(student.id);
     },
     closeChatModal() {
       this.chatModalOpen = false;
       this.chatDraft = "";
+    },
+    fetchConversation(studentId) {
+      const empresaId = resolveEmpresaId();
+      if (!studentId || !empresaId) {
+        this.chatError = "Professor nao encontrado.";
+        return;
+      }
+      this.chatLoading = true;
+      const params = new URLSearchParams({
+        empresa_id: empresaId,
+        user_id: String(studentId)
+      });
+      const professorId = resolveProfessorId();
+      if (professorId) {
+        params.set("professor_id", professorId);
+      }
+      fetch(`${API_BASE}/api/conversations?${params.toString()}`, {
+        headers: {
+          "Content-Type": "application/json",
+          ...authHeaders()
+        }
+      })
+        .then(async (response) => {
+          const data = await response.json().catch(() => ({}));
+          if (!response.ok) {
+            throw new Error(data.error || "Erro ao carregar conversa.");
+          }
+          const normalized = normalizeMessages(extractMessages(data));
+          this.$set(this.chatMessagesByStudent, studentId, normalized);
+        })
+        .catch((error) => {
+          this.chatError = error.message || "Erro ao carregar conversa.";
+          if (!this.chatMessagesByStudent[studentId]) {
+            this.$set(this.chatMessagesByStudent, studentId, []);
+          }
+        })
+        .finally(() => {
+          this.chatLoading = false;
+        });
     },
     sendChatMessage() {
       const message = this.chatDraft.trim();
@@ -212,13 +314,41 @@ export default {
       const now = new Date();
       const time = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
 
-      const existing = this.chatMessagesByStudent[this.chatStudent.id] || [];
-      this.chatMessagesByStudent[this.chatStudent.id] = [
-        ...existing,
-        { from: "me", text: message, time }
-      ];
-      saveChatStorage(this.chatMessagesByStudent);
+      const studentId = this.chatStudent.id;
+      const existing = this.chatMessagesByStudent[studentId] || [];
+      this.chatMessagesByStudent[studentId] = [...existing, { from: "me", text: message, time }];
       this.chatDraft = "";
+
+      const payload = {
+        empresa_id: resolveEmpresaId(),
+        professor_id: resolveProfessorId(),
+        user_id: studentId,
+        aluno_id: studentId,
+        mensagem: message,
+        message
+      };
+
+      fetch(`${API_BASE}/chat/store`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...authHeaders()
+        },
+        body: JSON.stringify(payload)
+      })
+        .then(async (response) => {
+          const data = await response.json().catch(() => ({}));
+          if (!response.ok) {
+            throw new Error(data.error || "Erro ao enviar mensagem.");
+          }
+          const normalized = normalizeMessages(extractMessages(data));
+          if (normalized.length) {
+            this.$set(this.chatMessagesByStudent, studentId, normalized);
+          }
+        })
+        .catch((error) => {
+          this.chatError = error.message || "Erro ao enviar mensagem.";
+        });
     }
   }
 };
