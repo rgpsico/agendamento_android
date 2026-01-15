@@ -39,7 +39,7 @@
         </thead>
         <tbody>
           <tr v-for="appt in filteredAppointments" :key="appt.id">
-            <td>{{ appt.date }}</td>
+            <td>{{ formatDatePtBr(appt.data_da_aula) }}</td>
             <td>{{ appt.time }}</td>
             <td>{{ appt.studentName }}</td>
             <td>{{ appt.serviceName }}</td>
@@ -112,6 +112,25 @@
 <script>
 export default {
   name: "ProfessorAppointmentsView",
+  methods: {
+    formatDatePtBr(value) {
+      if (!value) {
+        return "";
+      }
+
+      const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(value);
+      if (match) {
+        return `${match[3]}/${match[2]}/${match[1]}`;
+      }
+
+      const parsed = new Date(value);
+      if (Number.isNaN(parsed.getTime())) {
+        return value;
+      }
+
+      return parsed.toLocaleDateString("pt-BR");
+    }
+  },
   props: {
     appointmentsLoading: {
       type: Boolean,

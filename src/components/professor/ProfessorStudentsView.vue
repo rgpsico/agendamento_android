@@ -22,7 +22,7 @@
             <td>{{ student.nome }}</td>
             <td>{{ student.email }}</td>
             <td>{{ student.telefone }}</td>
-            <td>{{ student.data_nascimento }}</td>
+            <td>{{ formatDatePtBr(student.data_nascimento) }}</td>
             <td>
               <div class="actions">
                 <button class="text-btn" @click="editStudent(student)">Editar</button>
@@ -258,6 +258,23 @@ export default {
     }
   },
   methods: {
+    formatDatePtBr(value) {
+      if (!value) {
+        return "";
+      }
+
+      const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(value);
+      if (match) {
+        return `${match[3]}/${match[2]}/${match[1]}`;
+      }
+
+      const parsed = new Date(value);
+      if (Number.isNaN(parsed.getTime())) {
+        return value;
+      }
+
+      return parsed.toLocaleDateString("pt-BR");
+    },
     openChat(student) {
       this.chatStudent = student;
       this.chatModalOpen = true;

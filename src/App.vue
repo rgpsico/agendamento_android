@@ -1890,6 +1890,7 @@ export default {
           }
           saveStorage(STORAGE.STUDENTS, this.students);
           this.closeStudentModal();
+          this.fetchStudents();
         })
         .catch((error) => {
           this.studentsError = error.message || "Erro ao salvar aluno.";
