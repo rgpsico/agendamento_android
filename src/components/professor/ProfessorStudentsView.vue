@@ -156,6 +156,7 @@ function formatMessageTime(value) {
 function extractMessages(payload) {
   if (!payload) return [];
   if (Array.isArray(payload)) return payload;
+  if (payload.last_message) return [payload.last_message];
   if (Array.isArray(payload.messages)) return payload.messages;
   if (Array.isArray(payload.mensagens)) return payload.mensagens;
   if (Array.isArray(payload.conversation?.messages)) return payload.conversation.messages;
@@ -170,7 +171,7 @@ function normalizeMessages(messages) {
   const professorId = resolveProfessorId();
   return messages
     .map((msg) => {
-      const text = msg.text || msg.mensagem || msg.message || msg.conteudo || "";
+      const text = msg.text || msg.mensagem || msg.message || msg.conteudo || msg.body || "";
       const time = formatMessageTime(msg.time || msg.hora || msg.created_at || msg.data_hora);
       const from =
         normalizeSender(msg.from || msg.remetente || msg.autor) ||
@@ -188,6 +189,18 @@ function normalizeMessages(messages) {
       return { from, text, time };
     })
     .filter(Boolean);
+}
+
+function extractConversationId(payload) {
+  if (!payload) return "";
+  return (
+    payload.conversation_id ||
+    payload.conversation?.id ||
+    payload.conversa?.id ||
+    payload.data?.conversation_id ||
+    payload.data?.conversation?.id ||
+    ""
+  );
 }
 
 export default {
@@ -244,6 +257,7 @@ export default {
       chatStudent: null,
       chatDraft: "",
       chatMessagesByStudent: {},
+      chatConversationIdByStudent: {},
       chatLoading: false,
       chatError: ""
     };
@@ -311,7 +325,12 @@ export default {
           if (!response.ok) {
             throw new Error(data.error || "Erro ao carregar conversa.");
           }
-          const normalized = normalizeMessages(extractMessages(data));
+          const conversation = Array.isArray(data) ? data[0] : data;
+          const conversationId = extractConversationId(conversation);
+          if (conversationId) {
+            this.$set(this.chatConversationIdByStudent, studentId, conversationId);
+          }
+          const normalized = normalizeMessages(extractMessages(conversation));
           this.$set(this.chatMessagesByStudent, studentId, normalized);
         })
         .catch((error) => {
@@ -337,15 +356,23 @@ export default {
       this.chatDraft = "";
 
       const payload = {
-        empresa_id: resolveEmpresaId(),
-        professor_id: resolveProfessorId(),
-        user_id: studentId,
-        aluno_id: studentId,
         mensagem: message,
-        message
+        aluno_user_id: studentId
       };
+      const conversationId = this.chatConversationIdByStudent[studentId];
+      if (conversationId) {
+        payload.conversation_id = conversationId;
+      }
+      const professorId = resolveProfessorId();
+      if (professorId) {
+        payload.professor_user_id = professorId;
+      }
+      const empresaId = resolveEmpresaId();
+      if (empresaId) {
+        payload.empresa_id = empresaId;
+      }
 
-      fetch(`${API_BASE}/chat/store`, {
+      fetch(`${API_BASE}/api/conversations/professor/mensagem`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -358,9 +385,9 @@ export default {
           if (!response.ok) {
             throw new Error(data.error || "Erro ao enviar mensagem.");
           }
-          const normalized = normalizeMessages(extractMessages(data));
-          if (normalized.length) {
-            this.$set(this.chatMessagesByStudent, studentId, normalized);
+          const newConversationId = extractConversationId(data);
+          if (newConversationId) {
+            this.$set(this.chatConversationIdByStudent, studentId, newConversationId);
           }
         })
         .catch((error) => {

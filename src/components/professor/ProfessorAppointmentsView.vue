@@ -78,7 +78,7 @@
             <select v-model="appointmentForm.studentId">
               <option disabled value="">Selecione</option>
               <option v-for="student in students" :key="student.id" :value="student.id">
-                {{ student.name }}
+                {{ studentLabel(student) }}
               </option>
             </select>
           </label>
@@ -129,6 +129,21 @@ export default {
       }
 
       return parsed.toLocaleDateString("pt-BR");
+    },
+    studentLabel(student) {
+      if (!student) {
+        return "";
+      }
+      if (student.nome) {
+        return student.nome;
+      }
+      if (student.name) {
+        return student.name;
+      }
+      if (student.usuario && student.usuario.nome) {
+        return student.usuario.nome;
+      }
+      return "";
     }
   },
   props: {
