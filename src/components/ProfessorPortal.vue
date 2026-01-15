@@ -54,6 +54,8 @@
           :reset-appointment-form="resetAppointmentForm"
         />
 
+        <ProfessorMessagesView v-if="currentTab === 'messages'" />
+
         <ProfessorServicesView
           v-if="currentTab === 'services'"
           :services-loading="servicesLoading"
@@ -138,6 +140,19 @@
       </button>
       <button
         class="bottom-nav-btn"
+        :class="{ active: currentTab === 'messages' }"
+        @click="goToTab('messages')"
+      >
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M4 6h16v9a2 2 0 0 1-2 2H9l-4 3v-3H6a2 2 0 0 1-2-2z" fill="none" stroke="currentColor" stroke-width="2"></path>
+          <circle cx="9" cy="10" r="1.3" fill="currentColor"></circle>
+          <circle cx="12" cy="10" r="1.3" fill="currentColor"></circle>
+          <circle cx="15" cy="10" r="1.3" fill="currentColor"></circle>
+        </svg>
+        <span>Mensagens</span>
+      </button>
+      <button
+        class="bottom-nav-btn"
         :class="{ active: currentTab === 'services' }"
         @click="goToTab('services')"
       >
@@ -193,6 +208,7 @@
 import ProfessorDashboardView from "./professor/ProfessorDashboardView.vue";
 import ProfessorDayScheduleView from "./professor/ProfessorDayScheduleView.vue";
 import ProfessorAppointmentsView from "./professor/ProfessorAppointmentsView.vue";
+import ProfessorMessagesView from "./professor/ProfessorMessagesView.vue";
 import ProfessorServicesView from "./professor/ProfessorServicesView.vue";
 import ProfessorStudentsView from "./professor/ProfessorStudentsView.vue";
 import ProfessorAvailabilityView from "./professor/ProfessorAvailabilityView.vue";
@@ -212,6 +228,7 @@ export default {
     ProfessorDashboardView,
     ProfessorDayScheduleView,
     ProfessorAppointmentsView,
+    ProfessorMessagesView,
     ProfessorServicesView,
     ProfessorStudentsView,
     ProfessorAvailabilityView,
