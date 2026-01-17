@@ -64,6 +64,7 @@
               <h4 class="student-name">{{ conv.studentName }}</h4>
               <span class="time" v-if="conv.lastMessageTime">{{ conv.lastMessageTime }}</span>
             </div>
+            <p v-if="conv.studentEmail" class="student-email">{{ conv.studentEmail }}</p>
             <p class="last-message">{{ conv.lastMessage }}</p>
           </div>
           <div class="conversation-arrow">
@@ -276,6 +277,14 @@ function normalizeConversation(conv) {
     conv.aluno_nome ||
     conv.alunoNome ||
     "Aluno";
+  const studentEmail =
+    user.email ||
+    user.email_address ||
+    user.emailAddress ||
+    conv.studentEmail ||
+    conv.aluno_email ||
+    conv.alunoEmail ||
+    "";
   const last = conv.last_message || {};
   const lastMessage = last.body || last.mensagem || last.message || last.text || "-";
   const lastMessageTime = formatDateTimePtBr(last.created_at || last.data_hora || "");
@@ -283,6 +292,7 @@ function normalizeConversation(conv) {
     id: conv.id,
     studentId,
     studentName,
+    studentEmail,
     lastMessage,
     lastMessageTime
   };
@@ -357,7 +367,16 @@ export default {
             throw new Error(data.error || "Erro ao carregar conversas.");
           }
           const list = Array.isArray(data) ? data : data.data || [];
-          this.conversations = list.map((conv) => normalizeConversation(conv));
+          const normalized = list.map((conv) => normalizeConversation(conv));
+          const seen = new Set();
+          const deduped = [];
+          normalized.forEach((conv) => {
+            const key = conv.studentId || conv.studentEmail || conv.studentName;
+            if (!key || seen.has(key)) return;
+            seen.add(key);
+            deduped.push(conv);
+          });
+          this.conversations = deduped;
         })
         .catch((error) => {
           this.error = error.message || "Erro ao carregar conversas.";
@@ -674,6 +693,13 @@ export default {
   font-size: 16px;
   font-weight: 600;
   color: #1e293b;
+}
+
+.student-email {
+  margin: 0 0 6px;
+  font-size: 13px;
+  color: #94a3b8;
+  word-break: break-word;
 }
 
 .time {
