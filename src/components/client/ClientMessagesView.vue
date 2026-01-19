@@ -161,7 +161,7 @@
 <script>
 const PROD_API_BASE = "https://agendamento.rjpasseios.com.br";
 const ENV_API_BASE = process.env.VUE_APP_API_BASE;
-const API_BASE = ENV_API_BASE || PROD_API_BASE;
+const API_BASE = ENV_API_BASE || (process.env.NODE_ENV === "development" ? "" : PROD_API_BASE);
 const CLIENT_SEND_ENDPOINT = `${API_BASE}/api/conversations/professor/mensagem`;
 
 const STORAGE = {
@@ -405,6 +405,7 @@ export default {
       })
         .then(async (response) => {
           const data = await response.json().catch(() => []);
+        
           if (!response.ok) {
             throw new Error(data.error || "Erro ao carregar conversas.");
           }
@@ -450,6 +451,7 @@ export default {
         return;
       }
       this.chatLoading = true;
+      this.chatError = "";
       const params = new URLSearchParams({
         empresa_id: empresaId,
         user_id: String(studentId)
@@ -472,12 +474,32 @@ export default {
             throw new Error(data.error || "Erro ao carregar conversa.");
           }
           const conversation = Array.isArray(data) ? data[0] : data;
-          const conversationId = extractConversationId(conversation);
-          if (conversationId) {
-            this.$set(this.chatConversationIdByTeacher, teacherId, conversationId);
+          const resolvedConversationId = extractConversationId(conversation) || conversationId;
+          if (resolvedConversationId) {
+            this.$set(this.chatConversationIdByTeacher, teacherId, resolvedConversationId);
           }
           const normalized = normalizeMessages(extractMessages(conversation), studentId);
-          this.$set(this.chatMessagesByTeacher, teacherId, normalized);
+          if (normalized.length || !resolvedConversationId) {
+            this.$set(this.chatMessagesByTeacher, teacherId, normalized);
+            return null;
+          }
+          const messageParams = new URLSearchParams({
+            conversation_id: String(resolvedConversationId)
+          });
+          return fetch(`${API_BASE}/api/mensagensPorConversa?${messageParams.toString()}`, {
+            headers: {
+              "Content-Type": "application/json",
+              ...authHeaders()
+            }
+          }).then(async (messageResponse) => {
+            const messageData = await messageResponse.json().catch(() => ({}));
+            if (!messageResponse.ok) {
+              throw new Error(messageData.error || "Erro ao carregar conversa.");
+            }
+            const fallbackMessages = normalizeMessages(messageData.messages || [], studentId);
+            this.$set(this.chatMessagesByTeacher, teacherId, fallbackMessages);
+            return null;
+          });
         })
         .catch((error) => {
           this.chatError = error.message || "Erro ao carregar conversa.";
@@ -494,6 +516,7 @@ export default {
     if (!message || !this.chatTeacher) return;
 
     const teacherId = this.chatTeacher.id;
+    alert(teacherId);
     if (!teacherId) {
       this.chatError = "Professor nao encontrado.";
       return;
