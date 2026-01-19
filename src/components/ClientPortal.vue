@@ -53,6 +53,11 @@
           :client-profile-saved="clientProfileSaved"
           :save-client-profile="saveClientProfile"
         />
+
+        <ClientMessagesView
+          v-if="clientTab === 'messages'"
+          :client-profile="clientProfile"
+        />
       </main>
     </div>
 
@@ -91,6 +96,16 @@
           <path d="M4 20c2-4 6-6 8-6s6 2 8 6" fill="none" stroke="currentColor" stroke-width="2"></path>
         </svg>
         <span>Perfil</span>
+      </button>
+      <button
+        class="bottom-nav-btn"
+        :class="{ active: clientTab === 'messages' }"
+        @click="goToClientTab('messages')"
+      >
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" fill="none" stroke="currentColor" stroke-width="2"></path>
+        </svg>
+        <span>Mensagens</span>
       </button>
     </nav>
 
@@ -138,6 +153,7 @@ import ClientCompaniesView from "./client/ClientCompaniesView.vue";
 import ClientProfileView from "./client/ClientProfileView.vue";
 import ClientServicesView from "./client/ClientServicesView.vue";
 import ClientSlotsModal from "./client/ClientSlotsModal.vue";
+import ClientMessagesView from "./client/ClientMessagesView.vue";
 
 export default {
   name: "ClientPortal",
@@ -146,6 +162,7 @@ export default {
     ClientCheckoutModal,
     ClientCompaniesView,
     ClientProfileView,
+    ClientMessagesView,
     ClientServicesView,
     ClientSlotsModal
   },

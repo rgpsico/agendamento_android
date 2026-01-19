@@ -36,6 +36,8 @@
       :appointment-form="appointmentForm"
       :students="students"
       :services="services"
+      :services-loading="servicesLoading"
+      :services-error="servicesError"
       :service-modal-open="serviceModalOpen"
       :service-form="serviceForm"
       :categories-loading="categoriesLoading"
@@ -184,6 +186,7 @@ const seedStudents = [
   { id: 3, name: "Pedro Santos", email: "pedro@email.com", phone: "(11) 99999-3333", history: "1 aula" }
 ];
 const seedClientProfile = {
+  id: "",
   nome: "Cliente",
   email: "cliente@email.com",
   telefone: "(11) 98888-0000",
@@ -1009,20 +1012,28 @@ export default {
         "Content-Type": "application/json",
         ...this.clientAuthHeaders()
       };
-      const parseUser = (data) => data?.user || data?.usuario || data;
-      const applyUser = (user) => {
-        if (!user) return;
-        const updatedProfile = {
-          ...this.clientProfile,
-          nome: user.nome || user.name || this.clientProfile.nome,
-          email: user.email || this.clientProfile.email,
-          telefone: user.telefone || user.phone || this.clientProfile.telefone,
-          documento: user.documento || this.clientProfile.documento,
-          foto: user.foto || user.avatar || this.clientProfile.foto
+        const parseUser = (data) => data?.user || data?.usuario || data;
+        const applyUser = (user) => {
+          if (!user) return;
+          const updatedProfile = {
+            ...this.clientProfile,
+            id:
+              user.id ||
+              user.user_id ||
+              user.usuario_id ||
+              user.aluno_id ||
+              user.alunoId ||
+              this.clientProfile.id ||
+              "",
+            nome: user.nome || user.name || this.clientProfile.nome,
+            email: user.email || this.clientProfile.email,
+            telefone: user.telefone || user.phone || this.clientProfile.telefone,
+            documento: user.documento || this.clientProfile.documento,
+            foto: user.foto || user.avatar || this.clientProfile.foto
+          };
+          this.clientProfile = updatedProfile;
+          saveStorage(STORAGE.CLIENT_PROFILE, this.clientProfile);
         };
-        this.clientProfile = updatedProfile;
-        saveStorage(STORAGE.CLIENT_PROFILE, this.clientProfile);
-      };
       fetch(API_BASE + "/api/me", { headers })
         .then(async (response) => {
           const data = await response.json().catch(() => ({}));

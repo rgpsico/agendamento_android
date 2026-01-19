@@ -307,6 +307,14 @@ export default {
       type: Array,
       required: true
     },
+    servicesLoading: {
+      type: Boolean,
+      required: true
+    },
+    servicesError: {
+      type: String,
+      default: ""
+    },
     serviceModalOpen: {
       type: Boolean,
       required: true
