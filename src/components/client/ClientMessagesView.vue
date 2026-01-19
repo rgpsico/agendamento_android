@@ -62,6 +62,7 @@
           <div class="conversation-info">
             <div class="conversation-header">
               <h4 class="teacher-name">{{ conv.teacherName }}</h4>
+              <span v-if="conv.teacherId" class="teacher-id">#{{ conv.teacherId }}</span>
               <span class="time" v-if="conv.lastMessageTime">{{ conv.lastMessageTime }}</span>
             </div>
             <p v-if="conv.teacherEmail" class="teacher-email">{{ conv.teacherEmail }}</p>
