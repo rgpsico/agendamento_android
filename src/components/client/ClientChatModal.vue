@@ -360,19 +360,65 @@ export default {
       socket.on(channel, this.socketUserHandler);
     },
 
-    subscribeToConversation(convId) {
+ subscribeToConversation(convId) {
       const cleanId = String(convId || "").trim();
-      if (!cleanId) return;
+      
+      console.log("🔍 DEBUG subscribeToConversation:");
+      console.log("  - convId recebido:", convId, "| tipo:", typeof convId);
+      console.log("  - cleanId processado:", cleanId, "| length:", cleanId.length);
+      
+      if (!cleanId) {
+        console.log("  ⚠️ cleanId vazio! Abortando subscription");
+        return;
+      }
 
-      const channel = `conversa_288`;
-      if (this.socketConversationChannel === channel) return;
+      // ⚠️ ATENÇÃO: Use cleanId diretamente, sem nenhuma outra variável!
+      const channel = `conversa_${cleanId}`;
+      this.socketConversationChannel = channel;
+      
+      console.log("  - Canal construído:", channel);
+      console.log("  - Canal atual:", this.socketConversationChannel);
+      
+      if (this.socketConversationChannel === channel) {
+        console.log("  ✓ Já inscrito neste canal, pulando");
+        return;
+      }
 
       this.unsubscribeConversationChannel();
-      console.log("subscribing to conversation channel:", channel);
+      console.log("  ✅ Inscrevendo no canal:", channel);
 
-      this.socketConversationChannel = channel;
-      this.socketConversationHandler = (payload) => this.handleIncomingMessage(payload);
+
+      
+      // Tenta entrar na sala (se o servidor usar rooms)
+      socket.emit('join_conversation', cleanId);
+      socket.emit('join', channel);
+      socket.emit('subscribe', channel);
+      
+      // Escuta o evento específico do canal
+      this.socketConversationHandler = (payload) => {
+        console.log(`📨 Mensagem via ${channel}:`, payload);
+        this.handleIncomingMessage(payload);
+      };
       socket.on(channel, this.socketConversationHandler);
+      
+      // Escuta eventos genéricos e filtra por conversation_id
+      if (!this.genericMessageHandler) {
+        this.genericMessageHandler = (payload) => {
+          console.log("📨 Mensagem genérica recebida:", payload);
+          
+          const msgConvId = String(payload.conversation_id || payload.conversationId || "");
+          if (msgConvId === cleanId) {
+            console.log("✅ Mensagem para esta conversa!");
+            this.handleIncomingMessage(payload);
+          }
+        };
+        
+        // Tenta vários nomes de eventos possíveis
+        socket.on('mensagem', this.genericMessageHandler);
+        socket.on('nova_mensagem', this.genericMessageHandler);
+        socket.on('message', this.genericMessageHandler);
+        socket.on('new_message', this.genericMessageHandler);
+      }
     },
 
     unsubscribeUserChannel() {
