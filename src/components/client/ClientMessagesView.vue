@@ -517,11 +517,11 @@ export default {
     if (!message || !this.chatTeacher) return;
 
     const teacherId = this.chatTeacher.id;
-    alert(teacherId);
-    if (!teacherId) {
-      this.chatError = "Professor nao encontrado.";
-      return;
-    }
+
+    // if (!teacherId) {
+    //   this.chatError = "Professor nao encontrado.";
+    //   return;
+    // }
 
     const now = new Date();
     const time = `${String(now.getHours()).padStart(2, "0")}:${String(
@@ -537,9 +537,10 @@ export default {
 
     this.chatDraft = "";
 
+ const empresaId = resolveEmpresaId();
     const payload = {
       mensagem: message,
-      professor_id: teacherId
+      professor_id: empresaId
     };
 
     const conversationId = this.chatConversationIdByTeacher[teacherId];
@@ -547,7 +548,7 @@ export default {
       payload.conversation_id = conversationId;
     }
 
-    const empresaId = resolveEmpresaId();
+   
     if (empresaId) {
       payload.empresa_id = empresaId;
     }
