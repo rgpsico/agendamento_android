@@ -178,165 +178,11 @@ const STORAGE = {
   CLIENT_COMPANY: "agenda_client_company_id"
 };
 
-const seedTeacher = { name: "Prof. Ana Silva", email: "prof@escola.com" };
-const seedServices = [];
-const seedStudents = [
-  { id: 1, name: "Lucas Mendes", email: "lucas@email.com", phone: "(11) 99999-1111", history: "3 aulas" },
-  { id: 2, name: "Mariana Costa", email: "mariana@email.com", phone: "(11) 99999-2222", history: "5 aulas" },
-  { id: 3, name: "Pedro Santos", email: "pedro@email.com", phone: "(11) 99999-3333", history: "1 aula" }
-];
-const seedClientProfile = {
-  id: "",
-  nome: "Cliente",
-  email: "cliente@email.com",
-  telefone: "(11) 98888-0000",
-  documento: "000.000.000-00",
-  foto: ""
-};
-const seedCompanies = [
-  {
-    id: 1,
-    nome: "RJP Passeios",
-    categoria: "Turismo",
-    cidade: "Rio de Janeiro",
-    descricao: "Passeios guiados com foco em experiencias locais."
-  },
-  {
-    id: 2,
-    nome: "Academia Movimento",
-    categoria: "Esportes",
-    cidade: "Sao Paulo",
-    descricao: "Treinos personalizados e aulas em grupo."
-  },
-  {
-    id: 3,
-    nome: "Studio Balance",
-    categoria: "Bem-estar",
-    cidade: "Curitiba",
-    descricao: "Yoga, pilates e terapias integrativas."
-  }
-];
-const seedClientServices = [
-  {
-    id: 11,
-    companyId: 1,
-    nome: "Passeio de Barco",
-    duracao: 90,
-    preco: 180,
-    descricao: "Tour pela orla com paradas para fotos."
-  },
-  {
-    id: 12,
-    companyId: 1,
-    nome: "City Tour",
-    duracao: 120,
-    preco: 220,
-    descricao: "Roteiro pelos pontos principais da cidade."
-  },
-  {
-    id: 21,
-    companyId: 2,
-    nome: "Treino Funcional",
-    duracao: 60,
-    preco: 80,
-    descricao: "Aulas em grupo com foco em condicionamento."
-  },
-  {
-    id: 22,
-    companyId: 2,
-    nome: "Personal Training",
-    duracao: 60,
-    preco: 150,
-    descricao: "Atendimento individual com plano personalizado."
-  },
-  {
-    id: 31,
-    companyId: 3,
-    nome: "Pilates",
-    duracao: 50,
-    preco: 120,
-    descricao: "Sessao de pilates em aparelhos."
-  },
-  {
-    id: 32,
-    companyId: 3,
-    nome: "Yoga Flow",
-    duracao: 70,
-    preco: 110,
-    descricao: "Aula de yoga dinamica com respiracao guiada."
-  }
-];
-const seedClientSlots = {
-  11: ["09:00", "10:20", "13:00", "15:40"],
-  12: ["08:30", "11:00", "14:30"],
-  21: ["07:00", "08:00", "18:00", "19:00"],
-  22: ["09:30", "12:00", "16:00"],
-  31: ["06:30", "10:00", "17:00"],
-  32: ["08:15", "12:15", "18:30"]
-};
-const seedClientBookings = [
-  {
-    id: 1001,
-    companyId: 1,
-    serviceId: 11,
-    date: addDays(todayISO(), 1),
-    time: "10:20",
-    status: "confirmado"
-  },
-  {
-    id: 1002,
-    companyId: 2,
-    serviceId: 21,
-    date: addDays(todayISO(), 3),
-    time: "18:00",
-    status: "pendente"
-  }
-];
 
 function todayISO() {
   return new Date().toISOString().slice(0, 10);
 }
 
-function addDays(baseDate, days) {
-  const dt = new Date(baseDate);
-  dt.setDate(dt.getDate() + days);
-  return dt.toISOString().slice(0, 10);
-}
-
-const seedAppointments = [
-  {
-    id: 1,
-    date: todayISO(),
-    time: "09:00",
-    studentId: 1,
-    serviceId: 1,
-    status: "confirmado"
-  },
-  {
-    id: 2,
-    date: todayISO(),
-    time: "11:30",
-    studentId: 2,
-    serviceId: 2,
-    status: "pendente"
-  },
-  {
-    id: 3,
-    date: addDays(todayISO(), 2),
-    time: "14:00",
-    studentId: 3,
-    serviceId: 1,
-    status: "confirmado"
-  },
-  {
-    id: 4,
-    date: addDays(todayISO(), 6),
-    time: "16:30",
-    studentId: 2,
-    serviceId: 3,
-    status: "cancelado"
-  }
-];
 const WEEKDAY_LABELS = ["Domingo", "Segunda", "Terca", "Quarta", "Quinta", "Sexta", "Sabado"];
 
 function loadStorage(key, fallback) {
@@ -385,17 +231,24 @@ export default {
       authLoading: false,
       clientLoading: false,
       currentTab: "dashboard",
-      teacher: loadStorage(STORAGE.TEACHER, seedTeacher),
-      services: loadStorage(STORAGE.SERVICES, seedServices),
-      students: loadStorage(STORAGE.STUDENTS, seedStudents),
-      appointments: loadStorage(STORAGE.APPOINTMENTS, seedAppointments),
+      teacher: loadStorage(STORAGE.TEACHER, { name: "", email: "" }),
+      services: loadStorage(STORAGE.SERVICES, []),
+      students: loadStorage(STORAGE.STUDENTS, []),
+      appointments: loadStorage(STORAGE.APPOINTMENTS, []),
       clientTab: "companies",
       clientLoginForm: {
         email: "",
         password: ""
       },
       clientLoginError: "",
-      clientProfile: loadStorage(STORAGE.CLIENT_PROFILE, seedClientProfile),
+      clientProfile: loadStorage(STORAGE.CLIENT_PROFILE, {
+        id: "",
+        nome: "",
+        email: "",
+        telefone: "",
+        documento: "",
+        foto: ""
+      }),
       clientProfileSaved: false,
       clientCompanies: [],
       clientCompaniesLoading: false,
@@ -406,7 +259,7 @@ export default {
       clientAvailableSlots: [],
       clientAvailabilityLoading: false,
       clientAvailabilityError: "",
-      clientBookings: loadStorage(STORAGE.CLIENT_BOOKINGS, seedClientBookings),
+      clientBookings: loadStorage(STORAGE.CLIENT_BOOKINGS, []),
       selectedCompanyId: loadStorage(STORAGE.CLIENT_COMPANY, ""),
       savedClientCompanyId: loadStorage(STORAGE.CLIENT_COMPANY, ""),
       selectedServiceId: "",
@@ -637,7 +490,6 @@ export default {
     }
   },
   created() {
-    this.seedStorage();
     if (this.isAuthenticated) {
       this.activePortal = "professor";
     } else if (this.clientAuthenticated) {
@@ -658,14 +510,6 @@ export default {
     }
   },
   methods: {
-    seedStorage() {
-      if (!localStorage.getItem(STORAGE.TEACHER)) saveStorage(STORAGE.TEACHER, seedTeacher);
-      if (!localStorage.getItem(STORAGE.SERVICES)) saveStorage(STORAGE.SERVICES, seedServices);
-      if (!localStorage.getItem(STORAGE.STUDENTS)) saveStorage(STORAGE.STUDENTS, seedStudents);
-      if (!localStorage.getItem(STORAGE.APPOINTMENTS)) saveStorage(STORAGE.APPOINTMENTS, seedAppointments);
-      if (!localStorage.getItem(STORAGE.CLIENT_PROFILE)) saveStorage(STORAGE.CLIENT_PROFILE, seedClientProfile);
-      if (!localStorage.getItem(STORAGE.CLIENT_BOOKINGS)) saveStorage(STORAGE.CLIENT_BOOKINGS, seedClientBookings);
-    },
     toggleSidebar() {
       this.showSidebar = !this.showSidebar;
     },
@@ -923,6 +767,16 @@ export default {
             throw new Error("Token nao recebido.");
           }
           localStorage.setItem(STORAGE.CLIENT_TOKEN, data.token);
+          const loginUserId =
+            data.user_id ||
+            data.userId ||
+            data.usuario_id ||
+            data.aluno_id ||
+            data.alunoId ||
+            "";
+          if (loginUserId) {
+            localStorage.setItem("user_id", loginUserId);
+          }
           this.clientAuthenticated = true;
           this.activePortal = "cliente";
           if (this.savedClientCompanyId) {
@@ -1289,7 +1143,8 @@ export default {
           this.clientCheckoutProfessorId = data.professor?.id || "";
           this.clientCheckoutModalidadeId = data.professor?.modalidade_id || "";
           this.clientCheckoutTokenGateway = data.token_gateway || "";
-          this.clientCheckoutAlunoId = data.user_id || "";
+          const storedUserId = localStorage.getItem("user_id") || "";
+          this.clientCheckoutAlunoId = storedUserId || data.user_id || "";
         })
         .catch((error) => {
           this.clientCheckoutError = error.message || "Erro ao carregar pagamento.";
