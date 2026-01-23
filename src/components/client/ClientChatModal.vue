@@ -223,7 +223,7 @@ export default {
       const empresaId = resolveEmpresaId();
       const studentId = resolveClientId(this.clientProfile);
 
-      if (!empresaId || !studentId) {
+      if (!studentId && !convId) {
         this.chatError = "Aluno não encontrado.";
         this.chatLoading = false;
         return;
@@ -233,13 +233,17 @@ export default {
       this.chatError = "";
 
       try {
-        const params = new URLSearchParams({
-          empresa_id: empresaId,
-          user_id: String(studentId)
-        });
-
+        const params = new URLSearchParams();
+        if (studentId) {
+          params.set("user_id", String(studentId));
+        }
+        if (convId) {
+          params.set("conversation_id", String(convId));
+        }
+        if (empresaId) {
+          params.set("empresa_id", empresaId);
+        }
         if (teacherId) params.set("professor_id", String(teacherId));
-        if (convId)     params.set("conversation_id", String(convId));
 
         const res = await fetch(`${API_BASE}/api/conversations?${params}`, {
           headers: { "Content-Type": "application/json", ...authHeaders() }

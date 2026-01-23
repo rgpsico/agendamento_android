@@ -30,12 +30,14 @@ function loadStoredProfile() {
 
 function resolveClientId(profile) {
   const data = profile || loadStoredProfile() || {};
+  const storedUserId = localStorage.getItem("user_id") || "";
   return (
     data.id ||
     data.user_id ||
     data.usuario_id ||
     data.aluno_id ||
     data.alunoId ||
+    storedUserId ||
     ""
   );
 }

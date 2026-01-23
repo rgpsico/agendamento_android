@@ -57,26 +57,18 @@ export default {
   },
   methods: {
     fetchConversations() {
-      const empresaId = resolveEmpresaId();
-      const studentId = resolveClientId(this.clientProfile);
-      if (!empresaId || !studentId) {
-        this.error = "Aluno nao encontrado.";
+      const headers = {
+        "Content-Type": "application/json",
+        ...authHeaders()
+      };
+      if (!headers.Authorization) {
+        this.error = "Login expirado.";
         this.conversations = [];
         return;
       }
-      const params = new URLSearchParams({
-        empresa_id: empresaId,
-        user_id: String(studentId),
-        aluno_id: String(studentId)
-      });
       this.loading = true;
       this.error = "";
-      fetch(`${API_BASE}/api/conversations/lista?${params.toString()}`, {
-        headers: {
-          "Content-Type": "application/json",
-          ...authHeaders()
-        }
-      })
+      fetch(`${API_BASE}/api/conversations`, { headers })
         .then(async (response) => {
           const data = await response.json().catch(() => []);
           if (!response.ok) {
@@ -87,7 +79,12 @@ export default {
           const seen = new Set();
           const deduped = [];
           normalized.forEach((conv) => {
-            const key = conv.teacherId || conv.teacherEmail || conv.teacherName;
+            const key =
+              conv.conversationId ||
+              conv.id ||
+              conv.teacherId ||
+              conv.teacherEmail ||
+              conv.teacherName;
             if (!key || seen.has(key)) return;
             seen.add(key);
             deduped.push(conv);
