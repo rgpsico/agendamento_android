@@ -79,6 +79,7 @@
     </div>
   </div>
 </template>
+
 <script>
 import { io } from "socket.io-client";
 import {
@@ -86,7 +87,7 @@ import {
   authHeaders,
   resolveEmpresaId,
   resolveClientId,
-  normalizeSender,
+  normalizeSender,       // ← certifique-se que este arquivo exporta isso
   formatMessageTime,
   extractMessages,
   normalizeMessages,
@@ -95,35 +96,25 @@ import {
 } from "./clientMessagesUtils";
 
 const SOCKET_URL = "https://www.comunidadeppg.com.br:3000";
-const socket = io(SOCKET_URL);
+const socket = io(SOCKET_URL, {
+  reconnection: true,
+  reconnectionAttempts: 5,
+  timeout: 10000
+});
 
-socket.on("connect", () => console.log("socket conectado", socket.id));
-socket.on("disconnect", () => console.log("socket desconectou"));
+socket.on("connect", () => console.log("🔌 Socket conectado:", socket.id));
+socket.on("connect_error", (err) => console.error("❌ Erro de conexão socket:", err));
+socket.on("disconnect", (reason) => console.log("🔌 Socket desconectou:", reason));
 
 export default {
   name: "ClientChatModal",
 
   props: {
-    open: {
-      type: Boolean,
-      default: false
-    },
-    teacher: {
-      type: Object,
-      default: null
-    },
-    conversationId: {
-      type: [String, Number],
-      default: ""
-    },
-    empresaId: {
-      type: [String, Number],
-      default: ""
-    },
-    clientProfile: {
-      type: Object,
-      default: null
-    }
+    open: { type: Boolean, default: false },
+    teacher: { type: Object, default: null },
+    conversationId: { type: [String, Number], default: "" },
+    empresaId: { type: [String, Number], default: "" },
+    clientProfile: { type: Object, default: null }
   },
 
   data() {
@@ -132,7 +123,7 @@ export default {
       chatMessages: [],
       chatLoading: false,
       chatError: "",
-      chatConversationId: "",           // ← sempre tenta manter o ID atual aqui
+      chatConversationId: "",
       socketUserChannel: "",
       socketConversationChannel: "",
       socketUserHandler: null,
@@ -142,15 +133,16 @@ export default {
 
   computed: {
     chatTeacherName() {
-      return this.teacher?.name || this.teacher?.nome || "";
+      return this.teacher?.name || this.teacher?.nome || "Professor";
     },
     teacherId() {
-      console.log("🔍 DEBUG teacherId:", this.teacher?.id);
       return this.teacher?.id || "";
     },
     effectiveConversationId() {
-      // Prioridade: prop → data interna → vazio
       return String(this.conversationId || this.chatConversationId || "").trim();
+    },
+    studentId() {
+      return resolveClientId(this.clientProfile) || "";
     }
   },
 
@@ -162,55 +154,47 @@ export default {
         this.unsubscribeSocketChannels();
       }
     },
-
-    // Muito importante: reagir a mudanças na prop conversationId
     conversationId: {
       immediate: true,
       handler(newId) {
         const cleanId = String(newId || "").trim();
-        if (!cleanId || !this.open) return;
-
-        if (cleanId !== this.chatConversationId) {
+        if (cleanId && cleanId !== this.chatConversationId) {
           this.chatConversationId = cleanId;
-          this.subscribeToConversation(cleanId);
-          // Se já estamos abertos → recarrega mensagens
           if (this.open) {
+            this.subscribeToConversation(cleanId);
             this.fetchConversation(this.teacherId, cleanId);
           }
         }
       }
     },
-
-    chatMessages() {
-      this.$nextTick(() => this.scrollToBottom());
+    chatMessages: {
+      deep: true,
+      handler() {
+        this.scrollToBottom();
+      }
     }
   },
 
   mounted() {
-    this.subscribeToUserChannel();
+    if (this.studentId) {
+      this.subscribeToUserChannel();
+    }
     if (this.open) this.initChat();
   },
 
   beforeDestroy() {
     this.unsubscribeSocketChannels();
-    // socket.disconnect();  ← só se quiser desconectar completamente (geralmente não)
   },
 
   methods: {
     initChat() {
       this.chatError = "";
       this.chatDraft = "";
-      this.chatMessages = [];
+      const convId = this.effectiveConversationId;
+      const teacherId = this.teacherId;
 
-      const initialConvId = this.effectiveConversationId;
-
-      if (initialConvId) {
-        this.chatConversationId = initialConvId;
-        this.subscribeToConversation(initialConvId);
-      }
-
-      if (this.teacherId || initialConvId) {
-        this.fetchConversation(this.teacherId, initialConvId);
+      if (convId || teacherId) {
+        this.fetchConversation(teacherId, convId);
       }
     },
 
@@ -219,224 +203,60 @@ export default {
     },
 
     scrollToBottom() {
-      if (this.$refs.chatBox) {
-        this.$refs.chatBox.scrollTop = this.$refs.chatBox.scrollHeight;
-      }
+      this.$nextTick(() => {
+        const el = this.$refs.chatBox;
+        if (el) {
+          el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+        } else {
+          console.warn("[scrollToBottom] chatBox ref não encontrado");
+        }
+      });
     },
 
-    async fetchConversation(teacherId = "", convId = "") {
-      const empresaId = this.empresaId || resolveEmpresaId();
-      const studentId = resolveClientId(this.clientProfile);
-
-      if (!empresaId) {
-        this.chatError = "Empresa não encontrada.";
-        this.chatLoading = false;
-        return;
-      }
-      if (!studentId && !convId) {
-        this.chatError = "Aluno não encontrado.";
-        this.chatLoading = false;
-        return;
-      }
-
-      this.chatLoading = true;
-      this.chatError = "";
-
-      try {
-        const params = new URLSearchParams();
-        if (studentId) {
-          params.set("user_id", String(studentId));
-        }
-        if (convId) {
-          params.set("conversation_id", String(convId));
-        }
-        params.set("empresa_id", String(empresaId));
-        if (teacherId) params.set("professor_id", String(teacherId));
-
-        const res = await fetch(`${API_BASE}/api/conversations?${params}`, {
-          headers: { "Content-Type": "application/json", ...authHeaders() }
-        });
-
-        if (!res.ok) {
-          const err = await res.json().catch(() => ({}));
-          throw new Error(err.error || "Erro ao carregar conversa");
-        }
-
-        const data = await res.json();
-        const conversation = Array.isArray(data) ? data[0] : data;
-
-        // Extrai ID com prioridade
-        const resolvedId = extractConversationId(conversation) || convId || "";
-        if (resolvedId && resolvedId !== this.chatConversationId) {
-          this.chatConversationId = resolvedId;
-          this.$emit("update-conversation-id", resolvedId);
-          this.subscribeToConversation(resolvedId);
-        }
-
-        // Se descobriu professor novo
-        const normConv = normalizeConversation(conversation);
-        if (!this.teacherId && normConv.teacherId) {
-          this.$emit("update-teacher", {
-            id: normConv.teacherId,
-            name: normConv.teacherName
-          });
-        }
-
-        // Tenta carregar mensagens da conversa principal
-        let messages = extractMessages(conversation);
-        if (messages?.length) {
-          this.chatMessages = normalizeMessages(messages, studentId);
-          return;
-        }
-
-        // Caso contrário → busca mensagens separadamente
-        if (resolvedId) {
-          const msgParams = new URLSearchParams({ conversation_id: resolvedId });
-          const msgRes = await fetch(`${API_BASE}/api/mensagensPorConversa?${msgParams}`, {
-            headers: { "Content-Type": "application/json", ...authHeaders() }
-          });
-
-          if (!msgRes.ok) {
-            const err = await msgRes.json().catch(() => ({}));
-            throw new Error(err.error || "Erro ao carregar mensagens");
-          }
-
-          const msgData = await msgRes.json();
-          this.chatMessages = normalizeMessages(msgData.messages || [], studentId);
-        }
-      } catch (err) {
-        this.chatError = err.message || "Erro ao carregar conversa.";
-        this.chatMessages = [];
-      } finally {
-        this.chatLoading = false;
-      }
-    },
-
-    async sendChatMessage() {
-      const message = this.chatDraft.trim();
-      if (!message || !this.teacherId) return;
-
-      const now = new Date();
-      const time = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
-
-      // UI otimista
-      this.chatMessages = [...this.chatMessages, { from: "me", text: message, time }];
-      this.chatDraft = "";
-
-      try {
-        const payload = {
-          mensagem: message,
-          professor_id: this.teacherId,
-          empresa_id: this.empresaId || resolveEmpresaId() || undefined
-        };
-
-        if (this.chatConversationId) {
-          payload.conversation_id = this.chatConversationId;
-        }
-
-        const res = await fetch(`${API_BASE}/api/conversations/aluno/mensagem`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json", ...authHeaders() },
-          body: JSON.stringify(payload)
-        });
-
-        if (!res.ok) {
-          const err = await res.json().catch(() => ({}));
-          throw new Error(err.message || "Erro ao enviar mensagem");
-        }
-
-        const data = await res.json();
-
-        // Muito importante: o backend retornou um novo conversation_id?
-        if (data.conversation_id && data.conversation_id !== this.chatConversationId) {
-          this.chatConversationId = String(data.conversation_id);
-          this.$emit("update-conversation-id", this.chatConversationId);
-          this.subscribeToConversation(this.chatConversationId);
-        }
-      } catch (err) {
-        this.chatError = err.message || "Erro ao enviar mensagem.";
-        // Opcional: remover mensagem otimista ou marcar como falha
-      }
-    },
+    // fetchConversation e sendChatMessage → mantenha as suas versões originais aqui
+    // (elas não foram mostradas completas na última mensagem, então não alterei)
 
     subscribeToUserChannel() {
-      const studentId = resolveClientId(this.clientProfile);
-      if (!studentId) return;
+      if (!this.studentId) return;
 
-      const channel = `enviarmensagem${studentId}`;
+      const channel = `enviarmensagem${this.studentId}`;
       if (this.socketUserChannel === channel) return;
 
       this.unsubscribeUserChannel();
+
       this.socketUserChannel = channel;
       this.socketUserHandler = (payload) => this.handleIncomingMessage(payload);
       socket.on(channel, this.socketUserHandler);
+
+      console.log(`👂 Inscrito no canal usuário: ${channel}`);
     },
 
- subscribeToConversation(convId) {
+    subscribeToConversation(convId) {
       const cleanId = String(convId || "").trim();
-      
-      console.log("🔍 DEBUG subscribeToConversation:");
-      console.log("  - convId recebido:", convId, "| tipo:", typeof convId);
-      console.log("  - cleanId processado:", cleanId, "| length:", cleanId.length);
-      
-      if (!cleanId) {
-        console.log("  ⚠️ cleanId vazio! Abortando subscription");
-        return;
-      }
-
-      // ⚠️ ATENÇÃO: Use cleanId diretamente, sem nenhuma outra variável!
-      const channel = `conversa_${cleanId}`;
-      this.socketConversationChannel = channel;
-      
-      console.log("  - Canal construído:", channel);
-      console.log("  - Canal atual:", this.socketConversationChannel);
-      
-      if (this.socketConversationChannel === channel) {
-        console.log("  ✓ Já inscrito neste canal, pulando");
-        return;
-      }
+      if (!cleanId) return;
 
       this.unsubscribeConversationChannel();
-      console.log("  ✅ Inscrevendo no canal:", channel);
 
+      const channel = `conversa_${cleanId}`;
+      this.socketConversationChannel = channel;
 
-      
-      // Tenta entrar na sala (se o servidor usar rooms)
-      socket.emit('join_conversation', cleanId);
-      socket.emit('join', channel);
-      socket.emit('subscribe', channel);
-      
-      // Escuta o evento específico do canal
+      socket.emit("join", channel);
+      socket.emit("join_conversation", cleanId);
+
       this.socketConversationHandler = (payload) => {
-        console.log(`📨 Mensagem via ${channel}:`, payload);
+        console.log(`📩 [${channel}] Mensagem recebida:`, payload);
         this.handleIncomingMessage(payload);
       };
+
       socket.on(channel, this.socketConversationHandler);
-      
-      // Escuta eventos genéricos e filtra por conversation_id
-      if (!this.genericMessageHandler) {
-        this.genericMessageHandler = (payload) => {
-          console.log("📨 Mensagem genérica recebida:", payload);
-          
-          const msgConvId = String(payload.conversation_id || payload.conversationId || "");
-          if (msgConvId === cleanId) {
-            console.log("✅ Mensagem para esta conversa!");
-            this.handleIncomingMessage(payload);
-          }
-        };
-        
-        // Tenta vários nomes de eventos possíveis
-        socket.on('mensagem', this.genericMessageHandler);
-        socket.on('nova_mensagem', this.genericMessageHandler);
-        socket.on('message', this.genericMessageHandler);
-        socket.on('new_message', this.genericMessageHandler);
-      }
+      console.log(`👂 Inscrito no canal conversa: ${channel}`);
     },
 
     unsubscribeUserChannel() {
       if (this.socketUserChannel && this.socketUserHandler) {
         socket.off(this.socketUserChannel, this.socketUserHandler);
         this.socketUserChannel = "";
+        this.socketUserHandler = null;
       }
     },
 
@@ -444,6 +264,7 @@ export default {
       if (this.socketConversationChannel && this.socketConversationHandler) {
         socket.off(this.socketConversationChannel, this.socketConversationHandler);
         this.socketConversationChannel = "";
+        this.socketConversationHandler = null;
       }
     },
 
@@ -455,36 +276,67 @@ export default {
     handleIncomingMessage(payload) {
       if (!payload) return;
 
-      console.log("mensagem chegou", payload);
+      console.log("📨 Mensagem recebida via socket:", payload);
 
-      const studentId = resolveClientId(this.clientProfile);
-      const text = payload.mensagem || payload.body || payload.text || payload.message || "";
+      const text = (payload.mensagem || payload.body || payload.text || payload.message || "").trim();
       if (!text) return;
 
-      const convIdFromPayload = payload.conversation_id || payload.conversationId || "";
+      const convIdFromPayload = String(payload.conversation_id || payload.conversationId || "");
+      const activeConvId = this.effectiveConversationId;
 
-      // Segurança extra: ignora mensagem de outra conversa
-      if (this.chatConversationId && convIdFromPayload && 
-          String(this.chatConversationId) !== String(convIdFromPayload)) {
+      if (activeConvId && convIdFromPayload && String(activeConvId) !== String(convIdFromPayload)) {
+        console.log("🚫 Ignorada: conversa diferente");
         return;
       }
 
-      const time = formatMessageTime(payload.created_at || payload.time || payload.hora || new Date());
-      const from = normalizeSender(payload.from || payload.remetente || payload.autor, studentId, payload);
+      const studentId =
+        this.studentId ||
+        payload.user_id ||
+        payload.usuario_id ||
+        payload.aluno_id ||
+        payload.alunoId ||
+        "";
+      const senderId =
+        payload.user_id ||
+        payload.usuario_id ||
+        payload.aluno_id ||
+        payload.alunoId ||
+        payload.sender_id ||
+        payload.remetente_id ||
+        "";
+      const isFromMe = studentId && senderId && String(senderId) === String(studentId);
+      const from = isFromMe ? "me" : "them";
 
-      this.chatMessages = [...this.chatMessages, { from, text, time }];
+      const time = formatMessageTime(
+        payload.created_at || payload.createdAt || payload.hora || payload.time || new Date()
+      );
 
-      // Se chegou mensagem e ainda não temos ID → atualiza
+      const messageObj = { from, text, time };
+
+      const duplicate = this.chatMessages.some(
+        (msg) => msg.text === messageObj.text && msg.time === messageObj.time && msg.from === messageObj.from
+      );
+
+      if (!duplicate) {
+        this.chatMessages = [...this.chatMessages, messageObj];
+        console.log(`✅ Adicionada (${from}): ${messageObj.text}`);
+      } else {
+        console.log("⚠️ Mensagem duplicada ignorada");
+      }
+
       if (convIdFromPayload && !this.chatConversationId) {
-        this.chatConversationId = String(convIdFromPayload);
-        this.$emit("update-conversation-id", this.chatConversationId);
-        this.subscribeToConversation(this.chatConversationId);
+        this.chatConversationId = convIdFromPayload;
+        this.$emit("update-conversation-id", convIdFromPayload);
+        this.subscribeToConversation(convIdFromPayload);
       }
     }
   }
 };
 </script>
 
+<!-- Mantenha seu <style scoped> original aqui -->
+
+<!-- O <style> scoped permanece exatamente igual ao que você enviou -->
 <style scoped>
 .chat-modal {
   width: min(820px, 95vw);

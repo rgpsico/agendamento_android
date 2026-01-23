@@ -1,6 +1,5 @@
 const PROD_API_BASE = "https://agendamento.rjpasseios.com.br";
-const ENV_API_BASE = process.env.VUE_APP_API_BASE;
-const API_BASE = ENV_API_BASE || (process.env.NODE_ENV === "development" ? "" : PROD_API_BASE);
+const API_BASE = PROD_API_BASE;
 
 const STORAGE = {
   TOKEN: "agenda_client_token",
@@ -203,6 +202,7 @@ function normalizeConversation(conv) {
   return {
     id: conv.id || conversationId,
     conversationId,
+    empresaId: conv.empresa_id || conv.empresaId || conv.company_id || conv.companyId || "",
     teacherId,
     teacherName,
     teacherEmail,

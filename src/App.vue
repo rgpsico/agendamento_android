@@ -160,11 +160,8 @@ import ProfessorPortal from "./components/ProfessorPortal.vue";
 import ClientPortal from "./components/ClientPortal.vue";
 
 const PROD_API_BASE = "https://agendamento.rjpasseios.com.br";
-const ENV_API_BASE = process.env.VUE_APP_API_BASE;
-const isLocalhost = typeof window !== "undefined" &&
-  (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1");
-const API_BASE = isLocalhost ? "https://agendamento.rjpasseios.com.br" : (ENV_API_BASE || PROD_API_BASE);
-const ASSET_BASE = ENV_API_BASE || PROD_API_BASE;
+const API_BASE = PROD_API_BASE;
+const ASSET_BASE = PROD_API_BASE;
 
 const STORAGE = {
   TOKEN: "agenda_token",
