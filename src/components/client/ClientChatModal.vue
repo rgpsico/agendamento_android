@@ -309,15 +309,16 @@ export default {
       try {
         const payload = {
           mensagem: message,
-          professor_id: this.teacherId,
-          empresa_id: this.empresaId || resolveEmpresaId() || undefined
+          professor_user_id: this.teacherId,
+          empresa_id: this.empresaId || resolveEmpresaId() || undefined,
+          aluno_user_id: resolveClientId(this.clientProfile) || undefined
         };
 
         if (this.chatConversationId) {
           payload.conversation_id = this.chatConversationId;
         }
 
-        const res = await fetch(`${API_BASE}/api/conversations/aluno/mensagem`, {
+        const res = await fetch(`${API_BASE}/api/conversations/professor/mensagem`, {
           method: "POST",
           headers: { "Content-Type": "application/json", ...authHeaders() },
           body: JSON.stringify(payload)

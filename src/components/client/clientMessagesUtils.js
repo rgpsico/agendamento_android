@@ -10,7 +10,7 @@ const STORAGE = {
 
 function authHeaders() {
   const token = localStorage.getItem(STORAGE.TOKEN);
-  return token ? { Authorization: `Bearer ${token}` } : {};
+  return token ? { Authorization: `Bearer ${token}`, Accept: "application/json" } : {};
 }
 
 function resolveEmpresaId() {
