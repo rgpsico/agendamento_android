@@ -614,6 +614,64 @@ export default {
         [field]: value
       };
     },
+    normalizeEnabledPaymentMethods(data) {
+      const enabled =
+        data?.enabled_methods ||
+        data?.enabledMethods ||
+        data?.metodos ||
+        data?.methods ||
+        null;
+
+      if (!enabled || typeof enabled !== "object") return null;
+
+      return Object.entries(enabled)
+        .filter(([_, value]) => {
+          if (value === true) return true;
+          if (value && typeof value === "object") {
+            if (Object.prototype.hasOwnProperty.call(value, "enabled")) {
+              return Boolean(value.enabled);
+            }
+            return Object.keys(value).length > 0;
+          }
+          return false;
+        })
+        .map(([key]) => key);
+    },
+    async fetchEnabledPaymentMethods(empresaId) {
+      if (!empresaId) return null;
+
+      const headers = {
+        "Content-Type": "application/json",
+        ...this.clientAuthHeaders()
+      };
+
+      const queryUrl = `${API_BASE}/api/empresa/tipopagamento/enabled?empresa_id=${encodeURIComponent(
+        empresaId
+      )}`;
+
+      try {
+        const response = await fetch(queryUrl, { headers });
+        if (response.ok) {
+          const data = await response.json().catch(() => ({}));
+          return this.normalizeEnabledPaymentMethods(data);
+        }
+      } catch (error) {
+        // Fall through to POST fallback.
+      }
+
+      try {
+        const response = await fetch(`${API_BASE}/api/empresa/tipopagamento/enabled`, {
+          method: "POST",
+          headers,
+          body: JSON.stringify({ empresa_id: empresaId })
+        });
+        if (!response.ok) return null;
+        const data = await response.json().catch(() => ({}));
+        return this.normalizeEnabledPaymentMethods(data);
+      } catch (error) {
+        return null;
+      }
+    },
     bookSlot(slot) {
       if (!this.selectedCompanyId || !this.selectedServiceId || !this.clientScheduleDate) return;
       const exists = this.clientBookings.some(
@@ -1135,7 +1193,16 @@ export default {
           if (!response.ok) {
             throw new Error(data.message || "Erro ao carregar pagamento.");
           }
-          const methods = Array.isArray(data.formasPagamento) ? data.formasPagamento : [];
+          let methods = Array.isArray(data.formasPagamento) ? data.formasPagamento : [];
+          const empresaId =
+            this.selectedCompany?.id ||
+            this.selectedCompanyId ||
+            data.empresa_id ||
+            "";
+          const enabledMethods = await this.fetchEnabledPaymentMethods(empresaId);
+          if (Array.isArray(enabledMethods)) {
+            methods = methods.filter((method) => enabledMethods.includes(method));
+          }
           this.clientCheckoutMethods = methods;
           if (!methods.includes(this.clientCheckoutMethod)) {
             this.clientCheckoutMethod = methods[0] || "";
@@ -1805,6 +1872,54 @@ export default {
     setAvailabilityMode(value) {
       this.availabilityMode = value;
     },
+    mapContractedSlots(items) {
+      if (!Array.isArray(items)) return [];
+      return items.map((item, index) => {
+        if (typeof item === "string") {
+          return {
+            key: `${item}-${index}`,
+            time: item,
+            label: "Agendado",
+            studentId: "",
+            studentName: ""
+          };
+        }
+        const rawDate =
+          item.data_da_aula ||
+          item.data ||
+          item.data_aula ||
+          item.data_agendamento ||
+          "";
+        const timeMatch = String(rawDate).match(/(\d{2}):(\d{2})/);
+        const time =
+          item.horario ||
+          item.time ||
+          item.hora ||
+          (timeMatch ? `${timeMatch[1]}:${timeMatch[2]}` : "-");
+        const aluno =
+          item.aluno_nome ||
+          item.alunoNome ||
+          item.aluno?.nome ||
+          item.aluno?.usuario?.nome ||
+          item.studentName ||
+          "Aluno";
+        const alunoId =
+          item.aluno_id ||
+          item.alunoId ||
+          item.aluno?.id ||
+          item.aluno?.usuario?.id ||
+          item.studentId ||
+          "";
+        const status = item.status || item.situacao || "Agendado";
+        return {
+          key: `${time}-${index}`,
+          time,
+          label: `${aluno} - ${status}`,
+          studentId: alunoId,
+          studentName: aluno
+        };
+      });
+    },
     fetchAvailability() {
       this.availabilityError = "";
       this.availabilitySlots = [];
@@ -1862,48 +1977,34 @@ export default {
           professor_id: String(professorId),
           servico_id: String(serviceId)
         });
-        const bookedReq = fetch(
-          `${API_BASE}/api/disponibilidade/horarios-contratados?${bookedParams.toString()}`,
-          {
-            headers: {
+        const bookedReq = (async () => {
+          try {
+            const headers = {
               "Content-Type": "application/json",
               ...this.authHeaders()
+            };
+            const primaryUrl = `${API_BASE}/api/agendamentos/com-cliente?${bookedParams.toString()}`;
+            const primaryRes = await fetch(primaryUrl, { headers });
+            const primaryData = await primaryRes.json().catch(() => []);
+            if (!primaryRes.ok) {
+              throw new Error(primaryData.error || "Erro ao carregar horarios contratados.");
             }
-          }
-        )
-          .then(async (response) => {
-            const data = await response.json().catch(() => []);
-            if (!response.ok) {
-              throw new Error(data.error || "Erro ao carregar horarios contratados.");
+            let slots = this.mapContractedSlots(primaryData);
+            if (!slots.length) {
+              const fallbackUrl = `${API_BASE}/api/disponibilidade/horarios-contratados?${bookedParams.toString()}`;
+              const fallbackRes = await fetch(fallbackUrl, { headers });
+              const fallbackData = await fallbackRes.json().catch(() => []);
+              if (fallbackRes.ok) {
+                slots = this.mapContractedSlots(fallbackData);
+              }
             }
-            this.contractedSlots = Array.isArray(data)
-              ? data.map((item, index) => {
-                  if (typeof item === "string") {
-                    return { key: `${item}-${index}`, time: item, label: "Contratado" };
-                  }
-                  const time = item.horario || item.time || item.hora || "-";
-                  const aluno =
-                    item.aluno_nome ||
-                    item.alunoNome ||
-                    item.aluno?.nome ||
-                    item.aluno?.usuario?.nome ||
-                    item.studentName ||
-                    "Aluno";
-                  const status = item.status || item.situacao || "contratado";
-                  return {
-                    key: `${time}-${index}`,
-                    time,
-                    label: `${aluno} - ${status}`
-                  };
-                })
-              : [];
-          })
-          .catch((error) => {
+            this.contractedSlots = slots;
+          } catch (error) {
             this.contractedError = error.message || "Erro ao carregar horarios contratados.";
-          })
-          .finally(() => {
+          } finally {
             this.contractedLoading = false;
-          });
+          }
+        })();
         requests.push(bookedReq);
       } else {
         this.contractedSlots = [];
