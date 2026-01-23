@@ -68,7 +68,7 @@ export default {
       }
       this.loading = true;
       this.error = "";
-      fetch(`${API_BASE}/api/conversations`, { headers })
+      fetch(`http://127.0.0.1:8000/api/listarconversasaluno?user_id=${resolveClientId(this.clientProfile)}`, { headers })
         .then(async (response) => {
           const data = await response.json().catch(() => []);
           if (!response.ok) {
@@ -100,6 +100,7 @@ export default {
         });
     },
     openConversation(conv) {
+      console.log("Opening conversation:", conv);
       if (!conv) {
         return;
       }

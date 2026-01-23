@@ -223,6 +223,11 @@ export default {
       const empresaId = resolveEmpresaId();
       const studentId = resolveClientId(this.clientProfile);
 
+      if (!empresaId) {
+        this.chatError = "Empresa não encontrada.";
+        this.chatLoading = false;
+        return;
+      }
       if (!studentId && !convId) {
         this.chatError = "Aluno não encontrado.";
         this.chatLoading = false;
@@ -240,9 +245,7 @@ export default {
         if (convId) {
           params.set("conversation_id", String(convId));
         }
-        if (empresaId) {
-          params.set("empresa_id", empresaId);
-        }
+        params.set("empresa_id", String(empresaId));
         if (teacherId) params.set("professor_id", String(teacherId));
 
         const res = await fetch(`${API_BASE}/api/conversations?${params}`, {

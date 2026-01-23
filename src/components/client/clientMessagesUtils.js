@@ -139,7 +139,8 @@ function normalizeConversation(conv) {
       lastMessageTime: ""
     };
   }
-  const conversationId = extractConversationId(conv) || conv.id || "";
+  const conversationId = extractConversationId(conv) || conv.conversation_id || conv.id || "";
+  const contato = conv.contato || conv.contact || {};
   const professor =
     conv.professor ||
     conv.teacher ||
@@ -147,9 +148,19 @@ function normalizeConversation(conv) {
     conv.professorUser ||
     conv.professor_user ||
     {};
+  const company =
+    conv.empresa ||
+    conv.company ||
+    conv.empresa_usuario ||
+    conv.company_user ||
+    conv.companyUser ||
+    {};
   const profUser = professor.usuario || professor.user || professor;
+  const companyUser = company.usuario || company.user || company;
   const teacherId =
+    contato.id ||
     profUser.id ||
+    companyUser.id ||
     conv.professor_id ||
     conv.professorId ||
     conv.professor_user_id ||
@@ -158,19 +169,33 @@ function normalizeConversation(conv) {
     conv.teacherId ||
     conv.teacher_user_id ||
     conv.teacherUserId ||
+    conv.empresa_id ||
+    conv.empresaId ||
+    conv.company_id ||
+    conv.companyId ||
     "";
   const teacherName =
+    contato.nome ||
+    contato.name ||
     profUser.nome ||
     profUser.name ||
+    companyUser.nome ||
+    companyUser.name ||
+    conv.empresa_nome ||
+    conv.companyName ||
     conv.professorName ||
     conv.professor_nome ||
     conv.teacherName ||
     "Professor";
   const teacherEmail =
+    contato.email ||
     profUser.email ||
+    companyUser.email ||
     conv.professorEmail ||
     conv.professor_email ||
     conv.teacherEmail ||
+    conv.empresa_email ||
+    conv.companyEmail ||
     "";
   const last = conv.last_message || {};
   const lastMessage = last.body || last.mensagem || last.message || last.text || "-";
