@@ -70,11 +70,13 @@ export default {
       this.error = "";
       fetch(`http://127.0.0.1:8000/api/listarconversasaluno?user_id=${resolveClientId(this.clientProfile)}`, { headers })
         .then(async (response) => {
+
           const data = await response.json().catch(() => []);
           if (!response.ok) {
             throw new Error(data.error || "Erro ao carregar conversas.");
           }
           const list = Array.isArray(data) ? data : data.data || [];
+          console.log("Fetched conversations:", list.empresa_id);
           const normalized = list.filter(Boolean).map((conv) => normalizeConversation(conv));
           const seen = new Set();
           const deduped = [];
@@ -82,7 +84,7 @@ export default {
             const key =
               conv.conversationId ||
               conv.id ||
-              conv.teacherId ||
+              conv.empresa_id ||
               conv.teacherEmail ||
               conv.teacherName;
             if (!key || seen.has(key)) return;

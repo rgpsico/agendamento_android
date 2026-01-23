@@ -116,6 +116,10 @@ export default {
       type: [String, Number],
       default: ""
     },
+    empresaId: {
+      type: [String, Number],
+      default: ""
+    },
     clientProfile: {
       type: Object,
       default: null
@@ -141,6 +145,7 @@ export default {
       return this.teacher?.name || this.teacher?.nome || "";
     },
     teacherId() {
+      console.log("🔍 DEBUG teacherId:", this.teacher?.id);
       return this.teacher?.id || "";
     },
     effectiveConversationId() {
@@ -220,7 +225,7 @@ export default {
     },
 
     async fetchConversation(teacherId = "", convId = "") {
-      const empresaId = resolveEmpresaId();
+      const empresaId = this.empresaId || resolveEmpresaId();
       const studentId = resolveClientId(this.clientProfile);
 
       if (!empresaId) {
@@ -322,7 +327,7 @@ export default {
         const payload = {
           mensagem: message,
           professor_id: this.teacherId,
-          empresa_id: resolveEmpresaId() || undefined
+          empresa_id: this.empresaId || resolveEmpresaId() || undefined
         };
 
         if (this.chatConversationId) {
