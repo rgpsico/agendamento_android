@@ -213,8 +213,131 @@ export default {
       });
     },
 
-    // fetchConversation e sendChatMessage → mantenha as suas versões originais aqui
-    // (elas não foram mostradas completas na última mensagem, então não alterei)
+    async fetchConversation(teacherId = "", convId = "") {
+      const empresaId = this.empresaId || resolveEmpresaId();
+      const studentId = resolveClientId(this.clientProfile);
+
+      if (!empresaId) {
+        this.chatError = "Empresa não encontrada.";
+        this.chatLoading = false;
+        return;
+      }
+      if (!studentId && !convId) {
+        this.chatError = "Aluno não encontrado.";
+        this.chatLoading = false;
+        return;
+      }
+
+      this.chatLoading = true;
+      this.chatError = "";
+
+      try {
+        const params = new URLSearchParams();
+        params.set("empresa_id", String(empresaId));
+        if (studentId) params.set("user_id", String(studentId));
+        if (teacherId) params.set("professor_id", String(teacherId));
+        if (convId) params.set("conversation_id", String(convId));
+
+        const res = await fetch(`${API_BASE}/api/conversations?${params}`, {
+          headers: { "Content-Type": "application/json", ...authHeaders() }
+        });
+
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err.error || err.message || "Erro ao carregar conversa");
+        }
+
+        const data = await res.json();
+        const conversation = Array.isArray(data) ? data[0] : data;
+
+        const resolvedId = extractConversationId(conversation) || convId || "";
+        if (resolvedId && resolvedId !== this.chatConversationId) {
+          this.chatConversationId = String(resolvedId);
+          this.$emit("update-conversation-id", this.chatConversationId);
+          this.subscribeToConversation(this.chatConversationId);
+        }
+
+        const normConv = normalizeConversation(conversation);
+        if (!this.teacherId && normConv.teacherId) {
+          this.$emit("update-teacher", {
+            id: normConv.teacherId,
+            name: normConv.teacherName
+          });
+        }
+
+        let messages = extractMessages(conversation);
+        if (messages?.length) {
+          this.chatMessages = normalizeMessages(messages, studentId);
+          return;
+        }
+
+        if (resolvedId) {
+          const msgParams = new URLSearchParams({ conversation_id: resolvedId });
+          const msgRes = await fetch(`${API_BASE}/api/mensagensPorConversa?${msgParams}`, {
+            headers: { "Content-Type": "application/json", ...authHeaders() }
+          });
+
+          if (!msgRes.ok) {
+            const err = await msgRes.json().catch(() => ({}));
+            throw new Error(err.error || err.message || "Erro ao carregar mensagens");
+          }
+
+          const msgData = await msgRes.json();
+          this.chatMessages = normalizeMessages(msgData.messages || [], studentId);
+        }
+      } catch (err) {
+        this.chatError = err.message || "Erro ao carregar conversa.";
+        this.chatMessages = [];
+      } finally {
+        this.chatLoading = false;
+      }
+    },
+
+    async sendChatMessage() {
+      const message = this.chatDraft.trim();
+      if (!message || !this.teacherId) return;
+
+      const now = new Date();
+      const time = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(
+        2,
+        "0"
+      )}`;
+
+      this.chatMessages = [...this.chatMessages, { from: "me", text: message, time }];
+      this.chatDraft = "";
+
+      try {
+        const payload = {
+          mensagem: message,
+          professor_id: this.teacherId,
+          empresa_id: this.empresaId || resolveEmpresaId() || undefined
+        };
+
+        if (this.chatConversationId) {
+          payload.conversation_id = this.chatConversationId;
+        }
+
+        const res = await fetch(`${API_BASE}/api/conversations/aluno/mensagem`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", ...authHeaders() },
+          body: JSON.stringify(payload)
+        });
+
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err.message || err.error || "Erro ao enviar mensagem");
+        }
+
+        const data = await res.json();
+        if (data.conversation_id && String(data.conversation_id) !== String(this.chatConversationId)) {
+          this.chatConversationId = String(data.conversation_id);
+          this.$emit("update-conversation-id", this.chatConversationId);
+          this.subscribeToConversation(this.chatConversationId);
+        }
+      } catch (err) {
+        this.chatError = err.message || "Erro ao enviar mensagem.";
+      }
+    },
 
     subscribeToUserChannel() {
       if (!this.studentId) return;
