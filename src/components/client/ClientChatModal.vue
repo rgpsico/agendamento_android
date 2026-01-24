@@ -217,11 +217,6 @@ export default {
       const empresaId = this.empresaId || resolveEmpresaId();
       const studentId = resolveClientId(this.clientProfile);
 
-      if (!empresaId) {
-        this.chatError = "Empresa não encontrada.";
-        this.chatLoading = false;
-        return;
-      }
       if (!studentId && !convId) {
         this.chatError = "Aluno não encontrado.";
         this.chatLoading = false;
@@ -235,10 +230,9 @@ export default {
         const params = new URLSearchParams();
         params.set("empresa_id", String(empresaId));
         if (studentId) params.set("user_id", String(studentId));
-        if (teacherId) params.set("professor_id", String(teacherId));
         if (convId) params.set("conversation_id", String(convId));
 
-        const res = await fetch(`${API_BASE}/api/conversations?${params}`, {
+        const res = await fetch(`${API_BASE}/api/aluno/listarmensagembyidconversa?${params}`, {
           headers: { "Content-Type": "application/json", ...authHeaders() }
         });
 
@@ -272,8 +266,15 @@ export default {
         }
 
         if (resolvedId) {
-          const msgParams = new URLSearchParams({ conversation_id: resolvedId });
-          const msgRes = await fetch(`${API_BASE}/api/mensagensPorConversa?${msgParams}`, {
+          if (!studentId) {
+            throw new Error("Aluno nÃ£o encontrado.");
+          }
+
+          const msgParams = new URLSearchParams({
+            conversation_id: resolvedId,
+            user_id: String(studentId)
+          });
+          const msgRes = await fetch(`${API_BASE}/api/aluno/listarmensagembyidconversa?${msgParams}`, {
             headers: { "Content-Type": "application/json", ...authHeaders() }
           });
 

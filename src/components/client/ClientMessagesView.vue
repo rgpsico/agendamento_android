@@ -104,6 +104,7 @@ export default {
         });
     },
     openConversation(conv) {
+    
       console.log("Opening conversation:", conv);
       if (!conv) {
         return;
@@ -112,6 +113,8 @@ export default {
       this.chatModalOpen = true;
       this.activeConversationId = conv.conversationId || conv.id;
       this.activeEmpresaId = conv.empresaId || "";
+
+      
     },
     closeChatModal() {
       this.chatModalOpen = false;
