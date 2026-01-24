@@ -11,6 +11,7 @@
       :open="chatModalOpen"
       :teacher="chatTeacher"
       :conversation-id="activeConversationId"
+      :empresa-id="activeEmpresaId"
       :client-profile="clientProfile"
       @close="closeChatModal"
       @update-conversation-id="updateConversationId"
@@ -49,7 +50,8 @@ export default {
       conversations: [],
       chatModalOpen: false,
       chatTeacher: null,
-      activeConversationId: ""
+      activeConversationId: "",
+      activeEmpresaId: ""
     };
   },
   created() {
@@ -109,10 +111,12 @@ export default {
       this.chatTeacher = { id: conv.teacherId, name: conv.teacherName };
       this.chatModalOpen = true;
       this.activeConversationId = conv.conversationId || conv.id;
+      this.activeEmpresaId = conv.empresaId || "";
     },
     closeChatModal() {
       this.chatModalOpen = false;
       this.activeConversationId = "";
+      this.activeEmpresaId = "";
     },
     updateConversationId(conversationId) {
       this.activeConversationId = conversationId;
