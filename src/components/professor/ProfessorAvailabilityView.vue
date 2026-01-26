@@ -179,7 +179,13 @@
             </div>
             <div class="slot-status">
               <span class="status-dot booked"></span>
-              {{ slot.label }}
+              <div class="slot-info">
+                <span class="slot-label">{{ slot.label }}</span>
+                <span v-if="slot.studentName || slot.studentEmail" class="slot-student">
+                  {{ slot.studentName }}
+                  <span v-if="slot.studentEmail">- {{ slot.studentEmail }}</span>
+                </span>
+              </div>
             </div>
           </div>
         </div>

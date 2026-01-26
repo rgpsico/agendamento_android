@@ -6,7 +6,12 @@
     </div>
     <p class="subtitle">{{ activeDayLabel }}</p>
     <div v-if="dayAppointments.length" class="list">
-      <div v-for="appt in dayAppointments" :key="appt.id" class="list-item">
+      <div
+        v-for="appt in dayAppointments"
+        :key="appt.id"
+        class="list-item clickable"
+        @click="handleAppointmentClick(appt)"
+      >
         <div>
           <strong>{{ appt.time }}</strong>
           <p>{{ appt.studentName }} - {{ appt.serviceName }}</p>
@@ -33,7 +38,23 @@ export default {
     goToTab: {
       type: Function,
       required: true
+    },
+    openChatFromAppointment: {
+      type: Function,
+      required: true
+    }
+  },
+  methods: {
+    handleAppointmentClick(appt) {
+      if (!appt || !appt.studentId) return;
+      this.openChatFromAppointment(appt);
     }
   }
 };
 </script>
+
+<style scoped>
+.list-item.clickable {
+  cursor: pointer;
+}
+</style>

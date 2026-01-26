@@ -128,6 +128,7 @@
               :key="index"
               class="chat-message"
               :class="msg.from === 'me' ? 'outgoing' : 'incoming'"
+              :ref="index === chatMessages.length - 1 ? 'lastMessage' : null"
             >
               <div class="message-bubble">
                 <span class="chat-text">{{ msg.text }}</span>
@@ -196,6 +197,7 @@ function resolveEmpresaId() {
 function resolveProfessorId() {
   return localStorage.getItem(STORAGE.PROFESSOR) || "";
 }
+
 
 function formatDateTimePtBr(value) {
   if (!value) return "";
@@ -311,6 +313,12 @@ function normalizeConversation(conv) {
 
 export default {
   name: "ProfessorMessagesView",
+  props: {
+    pendingChatStudent: {
+      type: Object,
+      default: null
+    }
+  },
   data() {
     return {
       loading: false,
@@ -348,10 +356,54 @@ export default {
     this.unsubscribeSocketChannels();
   },
   watch: {
+    pendingChatStudent: {
+      immediate: true,
+      handler(value) {
+        if (!value || !value.studentId) return;
+
+        const openPending = () => {
+          const match = this.conversations.find(
+            (conv) => String(conv.studentId) === String(value.studentId)
+          );
+          if (match) {
+            this.openConversation(match);
+            return;
+          }
+
+          this.openConversation({
+            studentId: value.studentId,
+            studentName: value.studentName || "Aluno"
+          });
+        };
+
+        if (!this.conversations.length && !this.loading) {
+          this.fetchConversations();
+        }
+
+        if (this.loading) {
+          const stop = this.$watch("loading", (isLoading) => {
+            if (!isLoading) {
+              openPending();
+              stop();
+            }
+          });
+          return;
+        }
+
+        openPending();
+      }
+    },
     chatMessages() {
       this.$nextTick(() => {
         this.scrollToBottom();
       });
+    },
+    chatModalOpen(isOpen) {
+      if (isOpen) {
+        this.$nextTick(() => {
+          this.scrollToBottom();
+        });
+      }
     }
   },
   methods: {
@@ -473,11 +525,19 @@ export default {
       }
     },
     scrollToBottom() {
-      if (this.$refs.chatBox) {
-        this.$refs.chatBox.scrollTop = this.$refs.chatBox.scrollHeight;
-      }
+      this.$nextTick(() => {
+        const last = this.$refs.lastMessage;
+        if (last && last.scrollIntoView) {
+          last.scrollIntoView({ behavior: "smooth", block: "end" });
+          return;
+        }
+        if (this.$refs.chatBox) {
+          this.$refs.chatBox.scrollTop = this.$refs.chatBox.scrollHeight;
+        }
+      });
     },
     fetchConversations() {
+      if (this.loading) return;
       const empresaId = resolveEmpresaId();
       if (!empresaId) {
         this.error = "Empresa não encontrada.";
@@ -532,11 +592,17 @@ export default {
       this.chatModalOpen = true;
       this.chatDraft = "";
       this.chatError = "";
-      if (conv.id) {
-        this.$set(this.chatConversationIdByStudent, conv.studentId, conv.id);
+      const existingConversationId =
+        conv.id || this.chatConversationIdByStudent[conv.studentId] || "";
+      if (existingConversationId) {
+        this.$set(this.chatConversationIdByStudent, conv.studentId, existingConversationId);
+        this.initSocketSubscriptions(existingConversationId);
+        this.fetchConversation(conv.studentId, existingConversationId);
+        return;
       }
-      this.initSocketSubscriptions(conv.id);
-      this.fetchConversation(conv.studentId, conv.id);
+
+      this.initSocketSubscriptions("");
+      this.$set(this.chatMessagesByStudent, conv.studentId, []);
     },
     closeChatModal() {
       this.chatModalOpen = false;

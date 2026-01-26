@@ -87,6 +87,8 @@
       :set-dashboard-start="setDashboardStart"
       :set-dashboard-end="setDashboardEnd"
       :set-availability-mode="setAvailabilityMode"
+      :open-chat-from-appointment="openChatFromAppointment"
+      :pending-chat-student="pendingProfessorChat"
     />
 
     <ClientPortal
@@ -230,6 +232,7 @@ export default {
       authLoading: false,
       clientLoading: false,
       currentTab: "dashboard",
+      pendingProfessorChat: null,
       teacher: loadStorage(STORAGE.TEACHER, { name: "", email: "" }),
       services: loadStorage(STORAGE.SERVICES, []),
       students: loadStorage(STORAGE.STUDENTS, []),
@@ -521,6 +524,14 @@ export default {
       if (tab === "availability" && this.availabilityQuery.date && this.availabilityQuery.serviceId) {
         this.fetchAvailability();
       }
+    },
+    openChatFromAppointment(appt) {
+      if (!appt || !appt.studentId) return;
+      this.pendingProfessorChat = {
+        studentId: appt.studentId,
+        studentName: appt.studentName || "Aluno"
+      };
+      this.goToTab("messages");
     },
     toggleClientSidebar() {
       this.showClientSidebar = !this.showClientSidebar;
@@ -1880,7 +1891,8 @@ export default {
             time: item,
             label: "Agendado",
             studentId: "",
-            studentName: ""
+            studentName: "",
+            studentEmail: ""
           };
         }
         const rawDate =
@@ -1909,13 +1921,21 @@ export default {
           item.aluno?.usuario?.id ||
           item.studentId ||
           "";
+        const alunoEmail =
+          item.aluno_email ||
+          item.alunoEmail ||
+          item.aluno?.email ||
+          item.aluno?.usuario?.email ||
+          item.studentEmail ||
+          "";
         const status = item.status || item.situacao || "Agendado";
         return {
           key: `${time}-${index}`,
           time,
-          label: `${aluno} - ${status}`,
+          label: status,
           studentId: alunoId,
-          studentName: aluno
+          studentName: aluno,
+          studentEmail: alunoEmail
         };
       });
     },

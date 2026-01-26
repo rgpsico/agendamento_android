@@ -34,6 +34,7 @@
           :active-day-label="activeDayLabel"
           :day-appointments="dayAppointments"
           :go-to-tab="goToTab"
+          :open-chat-from-appointment="openChatFromAppointment"
         />
 
         <ProfessorAppointmentsView
@@ -54,7 +55,10 @@
           :reset-appointment-form="resetAppointmentForm"
         />
 
-        <ProfessorMessagesView v-if="currentTab === 'messages'" />
+        <ProfessorMessagesView
+          v-if="currentTab === 'messages'"
+          :pending-chat-student="pendingChatStudent"
+        />
 
         <ProfessorServicesView
           v-if="currentTab === 'services'"
@@ -498,6 +502,14 @@ export default {
     setAvailabilityMode: {
       type: Function,
       required: true
+    },
+    openChatFromAppointment: {
+      type: Function,
+      required: true
+    },
+    pendingChatStudent: {
+      type: Object,
+      default: null
     }
   },
   data() {
