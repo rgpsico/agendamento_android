@@ -258,8 +258,19 @@
 </template>
 
 <script>
+import { io } from "socket.io-client";
 const PROD_API_BASE = "https://agendamento.rjpasseios.com.br";
 const API_BASE = PROD_API_BASE;
+const SOCKET_URL = "https://www.comunidadeppg.com.br:3000";
+const socket = io(SOCKET_URL, {
+  reconnection: true,
+  reconnectionAttempts: 5,
+  timeout: 10000
+});
+
+socket.on("connect", () => console.log("Socket conectado:", socket.id));
+socket.on("connect_error", (err) => console.error("Erro de conexao socket:", err));
+socket.on("disconnect", (reason) => console.log("Socket desconectou:", reason));
 
 const STORAGE = {
   TOKEN: "agenda_token",
@@ -467,8 +478,18 @@ export default {
       chatMessagesByStudent: {},
       chatConversationIdByStudent: {},
       chatLoading: false,
-      chatError: ""
+      chatError: "",
+      socketUserChannel: "",
+      socketConversationChannel: "",
+      socketUserHandler: null,
+      socketConversationHandler: null
     };
+  },
+  mounted() {
+    this.subscribeToProfessorChannel();
+  },
+  beforeDestroy() {
+    this.unsubscribeSocketChannels();
   },
   watch: {
     "availabilityQuery.date"() {
@@ -479,6 +500,121 @@ export default {
     }
   },
   methods: {
+    initSocketSubscriptions(conversationId) {
+      this.subscribeToProfessorChannel();
+      if (conversationId) {
+        this.subscribeToConversation(conversationId);
+      }
+    },
+    subscribeToProfessorChannel() {
+      const professorId = resolveProfessorId();
+      if (!professorId) return;
+
+      const channel = `enviarmensagem${professorId}`;
+      if (this.socketUserChannel === channel) return;
+
+      this.unsubscribeUserChannel();
+
+      this.socketUserChannel = channel;
+      this.socketUserHandler = (payload) => this.handleIncomingMessage(payload);
+      socket.on(channel, this.socketUserHandler);
+      console.log("Socket inscrito no canal:", channel);
+    },
+    subscribeToConversation(conversationId) {
+      const cleanId = String(conversationId || "").trim();
+      if (!cleanId) return;
+
+      this.unsubscribeConversationChannel();
+
+      const channel = `conversa_${cleanId}`;
+      this.socketConversationChannel = channel;
+
+      socket.emit("join", channel);
+      socket.emit("join_conversation", cleanId);
+
+      this.socketConversationHandler = (payload) => this.handleIncomingMessage(payload);
+      socket.on(channel, this.socketConversationHandler);
+      console.log("Socket inscrito no canal:", channel);
+    },
+    unsubscribeUserChannel() {
+      if (this.socketUserChannel && this.socketUserHandler) {
+        socket.off(this.socketUserChannel, this.socketUserHandler);
+        console.log("Socket saiu do canal:", this.socketUserChannel);
+        this.socketUserChannel = "";
+        this.socketUserHandler = null;
+      }
+    },
+    unsubscribeConversationChannel() {
+      if (this.socketConversationChannel && this.socketConversationHandler) {
+        socket.off(this.socketConversationChannel, this.socketConversationHandler);
+        console.log("Socket saiu do canal:", this.socketConversationChannel);
+        this.socketConversationChannel = "";
+        this.socketConversationHandler = null;
+      }
+    },
+    unsubscribeSocketChannels() {
+      this.unsubscribeUserChannel();
+      this.unsubscribeConversationChannel();
+    },
+    handleIncomingMessage(payload) {
+      if (!payload) return;
+
+      console.log("Mensagem recebida via socket:", payload);
+
+      const text = String(
+        payload.mensagem || payload.body || payload.text || payload.message || ""
+      ).trim();
+      if (!text) return;
+
+      const conversationId = String(
+        payload.conversation_id || payload.conversationId || ""
+      ).trim();
+      const professorId = resolveProfessorId();
+      const senderId = String(
+        payload.user_id ||
+          payload.usuario_id ||
+          payload.aluno_id ||
+          payload.alunoId ||
+          payload.sender_id ||
+          payload.remetente_id ||
+          payload.professor_id ||
+          payload.professorId ||
+          ""
+      );
+
+      const candidateStudentId =
+        payload.aluno_id ||
+        payload.alunoId ||
+        (payload.user_id && String(payload.user_id) !== String(professorId)
+          ? payload.user_id
+          : "") ||
+        (payload.remetente_id && String(payload.remetente_id) !== String(professorId)
+          ? payload.remetente_id
+          : "");
+      const studentId = String(candidateStudentId || this.chatStudent?.id || "");
+      if (!studentId) return;
+
+      const from = String(senderId) === String(professorId) ? "me" : "student";
+      const time = formatMessageTime(
+        payload.created_at || payload.createdAt || payload.hora || payload.time || new Date()
+      );
+
+      const messageObj = { from, text, time };
+      const existing = this.chatMessagesByStudent[studentId] || [];
+      const duplicate = existing.some(
+        (msg) => msg.text === messageObj.text && msg.time === messageObj.time && msg.from === messageObj.from
+      );
+      if (!duplicate) {
+        this.$set(this.chatMessagesByStudent, studentId, [...existing, messageObj]);
+      }
+
+      if (conversationId) {
+        this.$set(this.chatConversationIdByStudent, studentId, conversationId);
+        if (this.chatStudent && String(this.chatStudent.id) === String(studentId)) {
+          this.subscribeToConversation(conversationId);
+        }
+      }
+    },
     openAddSlot() {
       this.addSlotError = "";
       this.addSlotOpen = true;
@@ -526,6 +662,7 @@ export default {
     },
 
     openChatFromSlot(slot) {
+      console.log("Opening chat for slot:", slot);
       if (!slot || !slot.studentId) return;
       this.chatStudent = {
         id: slot.studentId,
@@ -533,55 +670,96 @@ export default {
       };
       this.chatModalOpen = true;
       this.chatError = "";
-      this.fetchConversation(slot.studentId);
+      const existingConversationId =
+        slot.conversationId || this.chatConversationIdByStudent[slot.studentId] || "";
+      if (existingConversationId) {
+        this.$set(this.chatConversationIdByStudent, slot.studentId, existingConversationId);
+      }
+      this.initSocketSubscriptions(existingConversationId);
+      this.fetchConversation(slot.studentId, existingConversationId);
     },
     closeChatModal() {
       this.chatModalOpen = false;
       this.chatDraft = "";
+      this.unsubscribeSocketChannels();
     },
-    fetchConversation(studentId) {
+    fetchConversation(studentId, conversationId) {
       const empresaId = resolveEmpresaId();
       if (!studentId || !empresaId) {
         this.chatError = "Professor nao encontrado.";
         return;
       }
       this.chatLoading = true;
-      const params = new URLSearchParams({
-        empresa_id: empresaId,
-        user_id: String(studentId)
-      });
-      const professorId = resolveProfessorId();
-      if (professorId) {
-        params.set("professor_id", professorId);
-      }
-      fetch(`${API_BASE}/api/conversations?${params.toString()}`, {
-        headers: {
-          "Content-Type": "application/json",
-          ...authHeaders()
+      const resolveConversationId = async () => {
+        if (conversationId) return conversationId;
+        const params = new URLSearchParams({
+          empresa_id: empresaId,
+          user_id: String(studentId)
+        });
+        const response = await fetch(
+          `${API_BASE}/api/conversations/aberta?${params.toString()}`,
+          {
+            headers: {
+              Accept: "application/json",
+              "Content-Type": "application/json",
+              ...authHeaders()
+            }
+          }
+        );
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          throw new Error(data.error || "Erro ao verificar conversa.");
         }
-      })
-        .then(async (response) => {
+        return data.conversation_id || extractConversationId(data) || "";
+      };
+
+      const loadConversation = async () => {
+        try {
+          const resolvedId = await resolveConversationId();
+          if (resolvedId) {
+            this.$set(this.chatConversationIdByStudent, studentId, resolvedId);
+            this.initSocketSubscriptions(resolvedId);
+          } else {
+            this.$set(this.chatMessagesByStudent, studentId, []);
+            return;
+          }
+
+          const params = new URLSearchParams({
+            empresa_id: empresaId,
+            conversation_id: String(resolvedId)
+          });
+          const professorId = resolveProfessorId();
+          if (professorId) {
+            params.set("user_id", professorId);
+          }
+          const response = await fetch(
+            `${API_BASE}/api/listarmensagembyidconversaprof?${params.toString()}`,
+            {
+              headers: {
+                Accept: "application/json",
+                "Content-Type": "application/json",
+                ...authHeaders()
+              }
+            }
+          );
           const data = await response.json().catch(() => ({}));
           if (!response.ok) {
             throw new Error(data.error || "Erro ao carregar conversa.");
           }
           const conversation = Array.isArray(data) ? data[0] : data;
-          const conversationId = extractConversationId(conversation);
-          if (conversationId) {
-            this.$set(this.chatConversationIdByStudent, studentId, conversationId);
-          }
           const normalized = normalizeMessages(extractMessages(conversation));
           this.$set(this.chatMessagesByStudent, studentId, normalized);
-        })
-        .catch((error) => {
+        } catch (error) {
           this.chatError = error.message || "Erro ao carregar conversa.";
           if (!this.chatMessagesByStudent[studentId]) {
             this.$set(this.chatMessagesByStudent, studentId, []);
           }
-        })
-        .finally(() => {
+        } finally {
           this.chatLoading = false;
-        });
+        }
+      };
+
+      loadConversation();
     },
     sendChatMessage() {
       const message = this.chatDraft.trim();
@@ -634,7 +812,7 @@ export default {
           this.chatError = error.message || "Erro ao enviar mensagem.";
         });
     }
-}
+  }
 };
 </script>
 

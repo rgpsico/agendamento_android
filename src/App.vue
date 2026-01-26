@@ -1915,10 +1915,11 @@ export default {
           item.studentName ||
           "Aluno";
         const alunoId =
+          item.aluno?.usuario?.id ||
+          item.aluno?.usuario_id ||
           item.aluno_id ||
           item.alunoId ||
           item.aluno?.id ||
-          item.aluno?.usuario?.id ||
           item.studentId ||
           "";
         const alunoEmail =
@@ -1929,13 +1930,22 @@ export default {
           item.studentEmail ||
           "";
         const status = item.status || item.situacao || "Agendado";
+        const conversationId =
+          item.conversation_id ||
+          item.conversa_id ||
+          item.conversation?.id ||
+          item.conversa?.id ||
+          item.chat_id ||
+          item.chatId ||
+          "";
         return {
           key: `${time}-${index}`,
           time,
           label: status,
           studentId: alunoId,
           studentName: aluno,
-          studentEmail: alunoEmail
+          studentEmail: alunoEmail,
+          conversationId
         };
       });
     },
