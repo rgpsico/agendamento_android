@@ -75,43 +75,36 @@
       </div>
     </div>
 
-    <div v-if="chatModalOpen" class="modal-overlay" @click.self="closeChatModal">
-      <div class="modal-card chat-modal">
-        <div class="view-header">
-          <div>
-            <h4>Conversar com {{ chatStudentName }}</h4>
-            <p class="hint">Mensagens diretas com o aluno.</p>
-          </div>
-          <button class="text-btn" @click="closeChatModal">Fechar</button>
-        </div>
-
-        <div class="chat-box">
-          <p v-if="chatLoading" class="hint">Carregando conversa...</p>
-          <p v-else-if="chatError" class="error">{{ chatError }}</p>
-          <p v-else-if="!chatMessages.length" class="hint">Nenhuma mensagem ainda.</p>
-          <div
-            v-for="(msg, index) in chatMessages"
-            :key="index"
-            class="chat-message"
-            :class="msg.from === 'me' ? 'outgoing' : 'incoming'"
-          >
-            <span class="chat-text">{{ msg.text }}</span>
-            <span class="chat-time">{{ msg.time }}</span>
-          </div>
-        </div>
-
-        <form class="chat-input" @submit.prevent="sendChatMessage">
-          <input v-model="chatDraft" type="text" placeholder="Digite sua mensagem" />
-          <button class="primary-btn" type="submit" :disabled="!chatDraft.trim()">Enviar</button>
-        </form>
-      </div>
-    </div>
+    <ProfessorAvailabilityChatModal
+      v-if="chatModalOpen"
+      :open="chatModalOpen"
+      :student-name="chatStudentName"
+      :messages="chatMessages"
+      :loading="chatLoading"
+      :error="chatError"
+      v-model="chatDraft"
+      @close="closeChatModal"
+      @send="sendChatMessage"
+    />
   </section>
 </template>
 
 <script>
+import { io } from "socket.io-client";
+import ProfessorAvailabilityChatModal from "./ProfessorAvailabilityChatModal.vue";
+
 const PROD_API_BASE = "https://agendamento.rjpasseios.com.br";
 const API_BASE = PROD_API_BASE;
+const SOCKET_URL = "https://www.comunidadeppg.com.br:3000";
+const socket = io(SOCKET_URL, {
+  reconnection: true,
+  reconnectionAttempts: 5,
+  timeout: 10000
+});
+
+socket.on("connect", () => console.log("Socket conectado:", socket.id));
+socket.on("connect_error", (err) => console.error("Erro de conexao socket:", err));
+socket.on("disconnect", (reason) => console.log("Socket desconectou:", reason));
 
 const STORAGE = {
   TOKEN: "agenda_token",
@@ -204,6 +197,9 @@ function extractConversationId(payload) {
 
 export default {
   name: "ProfessorStudentsView",
+  components: {
+    ProfessorAvailabilityChatModal
+  },
   props: {
     studentsLoading: {
       type: Boolean,
@@ -258,7 +254,11 @@ export default {
       chatMessagesByStudent: {},
       chatConversationIdByStudent: {},
       chatLoading: false,
-      chatError: ""
+      chatError: "",
+      socketUserChannel: "",
+      socketConversationChannel: "",
+      socketUserHandler: null,
+      socketConversationHandler: null
     };
   },
   computed: {
@@ -270,7 +270,130 @@ export default {
       return this.chatMessagesByStudent[this.chatStudent.id] || [];
     }
   },
+  mounted() {
+    this.subscribeToProfessorChannel();
+  },
+  beforeDestroy() {
+    this.unsubscribeSocketChannels();
+  },
   methods: {
+    initSocketSubscriptions(conversationId) {
+      this.subscribeToProfessorChannel();
+      if (conversationId) {
+        this.subscribeToConversation(conversationId);
+      }
+    },
+    subscribeToProfessorChannel() {
+      const professorId = resolveProfessorId();
+      if (!professorId) return;
+
+      const channel = `enviarmensagem${professorId}`;
+      if (this.socketUserChannel === channel) return;
+
+      this.unsubscribeUserChannel();
+
+      this.socketUserChannel = channel;
+      this.socketUserHandler = (payload) => this.handleIncomingMessage(payload);
+      socket.on(channel, this.socketUserHandler);
+      console.log("Socket inscrito no canal:", channel);
+    },
+    subscribeToConversation(conversationId) {
+      const cleanId = String(conversationId || "").trim();
+      if (!cleanId) return;
+
+      this.unsubscribeConversationChannel();
+
+      const channel = `conversa_${cleanId}`;
+      this.socketConversationChannel = channel;
+
+      socket.emit("join", channel);
+      socket.emit("join_conversation", cleanId);
+
+      this.socketConversationHandler = (payload) => this.handleIncomingMessage(payload);
+      socket.on(channel, this.socketConversationHandler);
+      console.log("Socket inscrito no canal:", channel);
+    },
+    unsubscribeUserChannel() {
+      if (this.socketUserChannel && this.socketUserHandler) {
+        socket.off(this.socketUserChannel, this.socketUserHandler);
+        console.log("Socket saiu do canal:", this.socketUserChannel);
+        this.socketUserChannel = "";
+        this.socketUserHandler = null;
+      }
+    },
+    unsubscribeConversationChannel() {
+      if (this.socketConversationChannel && this.socketConversationHandler) {
+        socket.off(this.socketConversationChannel, this.socketConversationHandler);
+        console.log("Socket saiu do canal:", this.socketConversationChannel);
+        this.socketConversationChannel = "";
+        this.socketConversationHandler = null;
+      }
+    },
+    unsubscribeSocketChannels() {
+      this.unsubscribeUserChannel();
+      this.unsubscribeConversationChannel();
+    },
+    handleIncomingMessage(payload) {
+      if (!payload) return;
+
+      console.log("Mensagem recebida via socket:", payload);
+
+      const text = String(
+        payload.mensagem || payload.body || payload.text || payload.message || ""
+      ).trim();
+      if (!text) return;
+
+      const conversationId = String(
+        payload.conversation_id || payload.conversationId || ""
+      ).trim();
+      const professorId = resolveProfessorId();
+      const senderId = String(
+        payload.user_id ||
+          payload.usuario_id ||
+          payload.aluno_id ||
+          payload.alunoId ||
+          payload.sender_id ||
+          payload.remetente_id ||
+          payload.professor_id ||
+          payload.professorId ||
+          ""
+      );
+      if (professorId && senderId && String(senderId) === String(professorId)) {
+        return;
+      }
+      const candidateStudentId =
+        payload.aluno_id ||
+        payload.alunoId ||
+        (payload.user_id && String(payload.user_id) !== String(professorId)
+          ? payload.user_id
+          : "") ||
+        (payload.remetente_id && String(payload.remetente_id) !== String(professorId)
+          ? payload.remetente_id
+          : "");
+      const studentId = String(candidateStudentId || this.chatStudent?.id || "");
+      if (!studentId) return;
+
+      const from = String(senderId) === String(professorId) ? "me" : "student";
+      const time = formatMessageTime(
+        payload.created_at || payload.createdAt || payload.hora || payload.time || new Date()
+      );
+
+      const messageObj = { from, text, time };
+      const existing = this.chatMessagesByStudent[studentId] || [];
+      const duplicate = existing.some(
+        (msg) => msg.text === messageObj.text && msg.time === messageObj.time && msg.from === messageObj.from
+      );
+      if (!duplicate) {
+        this.$set(this.chatMessagesByStudent, studentId, [...existing, messageObj]);
+      }
+
+      if (conversationId) {
+        this.$set(this.chatConversationIdByStudent, studentId, conversationId);
+        if (this.chatStudent && String(this.chatStudent.id) === String(studentId)) {
+          this.subscribeToConversation(conversationId);
+        }
+      }
+    },
     formatDatePtBr(value) {
       if (!value) {
         return "";
@@ -292,55 +415,100 @@ export default {
       this.chatStudent = student;
       this.chatModalOpen = true;
       this.chatError = "";
-      this.fetchConversation(student.id);
+      const existingConversationId =
+        student?.usuario?.last_conversation_with_empresa?.id ||
+        student?.last_conversation_with_empresa?.id ||
+        student?.conversation_id ||
+        this.chatConversationIdByStudent[student.id] ||
+        "";
+      if (existingConversationId) {
+        this.$set(this.chatConversationIdByStudent, student.id, existingConversationId);
+      }
+      this.initSocketSubscriptions(existingConversationId);
+      this.fetchConversation(student.id, existingConversationId);
     },
     closeChatModal() {
       this.chatModalOpen = false;
       this.chatDraft = "";
+      this.unsubscribeSocketChannels();
     },
-    fetchConversation(studentId) {
+    fetchConversation(studentId, conversationId) {
       const empresaId = resolveEmpresaId();
       if (!studentId || !empresaId) {
         this.chatError = "Professor nao encontrado.";
         return;
       }
       this.chatLoading = true;
-      const params = new URLSearchParams({
-        empresa_id: empresaId,
-        user_id: String(studentId)
-      });
-      const professorId = resolveProfessorId();
-      if (professorId) {
-        params.set("professor_id", professorId);
-      }
-      fetch(`${API_BASE}/api/conversations?${params.toString()}`, {
-        headers: {
-          "Content-Type": "application/json",
-          ...authHeaders()
+      const resolveConversationId = async () => {
+        if (conversationId) return conversationId;
+        const params = new URLSearchParams({
+          empresa_id: empresaId,
+          user_id: String(studentId)
+        });
+        const response = await fetch(
+          `${API_BASE}/api/conversations/aberta?${params.toString()}`,
+          {
+            headers: {
+              Accept: "application/json",
+              "Content-Type": "application/json",
+              ...authHeaders()
+            }
+          }
+        );
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          throw new Error(data.error || "Erro ao verificar conversa.");
         }
-      })
-        .then(async (response) => {
+        return data.conversation_id || extractConversationId(data) || "";
+      };
+
+      const loadConversation = async () => {
+        try {
+          const resolvedId = await resolveConversationId();
+          if (resolvedId) {
+            this.$set(this.chatConversationIdByStudent, studentId, resolvedId);
+            this.initSocketSubscriptions(resolvedId);
+          } else {
+            this.$set(this.chatMessagesByStudent, studentId, []);
+            return;
+          }
+
+          const params = new URLSearchParams({
+            empresa_id: empresaId,
+            conversation_id: String(resolvedId)
+          });
+          const professorId = resolveProfessorId();
+          if (professorId) {
+            params.set("user_id", professorId);
+          }
+          const response = await fetch(
+            `${API_BASE}/api/listarmensagembyidconversaprof?${params.toString()}`,
+            {
+              headers: {
+                Accept: "application/json",
+                "Content-Type": "application/json",
+                ...authHeaders()
+              }
+            }
+          );
           const data = await response.json().catch(() => ({}));
           if (!response.ok) {
             throw new Error(data.error || "Erro ao carregar conversa.");
           }
           const conversation = Array.isArray(data) ? data[0] : data;
-          const conversationId = extractConversationId(conversation);
-          if (conversationId) {
-            this.$set(this.chatConversationIdByStudent, studentId, conversationId);
-          }
           const normalized = normalizeMessages(extractMessages(conversation));
           this.$set(this.chatMessagesByStudent, studentId, normalized);
-        })
-        .catch((error) => {
+        } catch (error) {
           this.chatError = error.message || "Erro ao carregar conversa.";
           if (!this.chatMessagesByStudent[studentId]) {
             this.$set(this.chatMessagesByStudent, studentId, []);
           }
-        })
-        .finally(() => {
+        } finally {
           this.chatLoading = false;
-        });
+        }
+      };
+
+      loadConversation();
     },
     sendChatMessage() {
       const message = this.chatDraft.trim();
@@ -396,62 +564,3 @@ export default {
   }
 };
 </script>
-
-<style scoped>
-.chat-modal {
-  width: min(720px, 94vw);
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.chat-box {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  padding: 12px;
-  border-radius: 12px;
-  background: #f8f9fb;
-  min-height: 240px;
-  max-height: 420px;
-  overflow-y: auto;
-}
-
-.chat-message {
-  max-width: 70%;
-  padding: 10px 12px;
-  border-radius: 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.chat-message.incoming {
-  align-self: flex-start;
-  background: #ffffff;
-  border: 1px solid #e6e6e6;
-}
-
-.chat-message.outgoing {
-  align-self: flex-end;
-  background: #2c6ee8;
-  color: #ffffff;
-}
-
-.chat-time {
-  font-size: 11px;
-  opacity: 0.7;
-}
-
-.chat-input {
-  display: flex;
-  gap: 12px;
-}
-
-.chat-input input {
-  flex: 1;
-  padding: 10px 12px;
-  border-radius: 10px;
-  border: 1px solid #dcdcdc;
-}
-</style>
