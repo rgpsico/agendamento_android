@@ -7,6 +7,25 @@
   "client": [
     {
       "client_info": {
+        "mobilesdk_app_id": "1:67661308275:android:997c98502c1083d1d96506",
+        "android_client_info": {
+          "package_name": "com.agendappg.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDMpMoKiLBWqVHYGPd2AgXcAD1aOAIDa-A"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
         "mobilesdk_app_id": "1:67661308275:android:92d138989cf15bbad96506",
         "android_client_info": {
           "package_name": "com.rjpasseios.agendamento"
