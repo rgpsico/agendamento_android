@@ -163,8 +163,20 @@
 </template>
 
 <script>
+import { io } from "socket.io-client";
+
 const PROD_API_BASE = "https://agendamento.rjpasseios.com.br";
 const API_BASE = process.env.NODE_ENV === "production" ? PROD_API_BASE : "";
+const SOCKET_URL = "https://www.comunidadeppg.com.br:3000";
+const socket = io(SOCKET_URL, {
+  reconnection: true,
+  reconnectionAttempts: 5,
+  timeout: 10000
+});
+
+socket.on("connect", () => console.log("Socket conectado:", socket.id));
+socket.on("connect_error", (err) => console.error("Erro de conexao socket:", err));
+socket.on("disconnect", (reason) => console.log("Socket desconectou:", reason));
 
 const STORAGE = {
   TOKEN: "agenda_token",
@@ -310,7 +322,11 @@ export default {
       chatMessagesByStudent: {},
       chatConversationIdByStudent: {},
       chatLoading: false,
-      chatError: ""
+      chatError: "",
+      socketUserChannel: "",
+      socketConversationChannel: "",
+      socketUserHandler: null,
+      socketConversationHandler: null
     };
   },
   computed: {
@@ -325,6 +341,12 @@ export default {
   created() {
     this.fetchConversations();
   },
+  mounted() {
+    this.subscribeToProfessorChannel();
+  },
+  beforeDestroy() {
+    this.unsubscribeSocketChannels();
+  },
   watch: {
     chatMessages() {
       this.$nextTick(() => {
@@ -333,6 +355,120 @@ export default {
     }
   },
   methods: {
+    initSocketSubscriptions(conversationId) {
+      this.subscribeToProfessorChannel();
+      if (conversationId) {
+        this.subscribeToConversation(conversationId);
+      }
+    },
+    subscribeToProfessorChannel() {
+      const professorId = resolveProfessorId();
+      if (!professorId) return;
+
+      const channel = `enviarmensagem${professorId}`;
+      if (this.socketUserChannel === channel) return;
+
+      this.unsubscribeUserChannel();
+
+      this.socketUserChannel = channel;
+      this.socketUserHandler = (payload) => this.handleIncomingMessage(payload);
+      socket.on(channel, this.socketUserHandler);
+      console.log("Socket inscrito no canal:", channel);
+    },
+    subscribeToConversation(conversationId) {
+      const cleanId = String(conversationId || "").trim();
+      if (!cleanId) return;
+
+      this.unsubscribeConversationChannel();
+
+      const channel = `conversa_${cleanId}`;
+      this.socketConversationChannel = channel;
+
+      socket.emit("join", channel);
+      socket.emit("join_conversation", cleanId);
+
+      this.socketConversationHandler = (payload) => this.handleIncomingMessage(payload);
+      socket.on(channel, this.socketConversationHandler);
+      console.log("Socket inscrito no canal:", channel);
+    },
+    unsubscribeUserChannel() {
+      if (this.socketUserChannel && this.socketUserHandler) {
+        socket.off(this.socketUserChannel, this.socketUserHandler);
+        console.log("Socket saiu do canal:", this.socketUserChannel);
+        this.socketUserChannel = "";
+        this.socketUserHandler = null;
+      }
+    },
+    unsubscribeConversationChannel() {
+      if (this.socketConversationChannel && this.socketConversationHandler) {
+        socket.off(this.socketConversationChannel, this.socketConversationHandler);
+        console.log("Socket saiu do canal:", this.socketConversationChannel);
+        this.socketConversationChannel = "";
+        this.socketConversationHandler = null;
+      }
+    },
+    unsubscribeSocketChannels() {
+      this.unsubscribeUserChannel();
+      this.unsubscribeConversationChannel();
+    },
+    handleIncomingMessage(payload) {
+      if (!payload) return;
+
+      console.log("Mensagem recebida via socket:", payload);
+
+      const text = String(
+        payload.mensagem || payload.body || payload.text || payload.message || ""
+      ).trim();
+      if (!text) return;
+
+      const conversationId = String(
+        payload.conversation_id || payload.conversationId || ""
+      ).trim();
+      const professorId = resolveProfessorId();
+      const senderId = String(
+        payload.user_id ||
+          payload.usuario_id ||
+          payload.aluno_id ||
+          payload.alunoId ||
+          payload.sender_id ||
+          payload.remetente_id ||
+          payload.professor_id ||
+          payload.professorId ||
+          ""
+      );
+      const candidateStudentId =
+        payload.aluno_id ||
+        payload.alunoId ||
+        (payload.user_id && String(payload.user_id) !== String(professorId)
+          ? payload.user_id
+          : "") ||
+        (payload.remetente_id && String(payload.remetente_id) !== String(professorId)
+          ? payload.remetente_id
+          : "");
+      const studentId = String(candidateStudentId || this.chatStudent?.id || "");
+      if (!studentId) return;
+
+      const from = String(senderId) === String(professorId) ? "me" : "student";
+      const time = formatMessageTime(
+        payload.created_at || payload.createdAt || payload.hora || payload.time || new Date()
+      );
+
+      const messageObj = { from, text, time };
+      const existing = this.chatMessagesByStudent[studentId] || [];
+      const duplicate = existing.some(
+        (msg) => msg.text === messageObj.text && msg.time === messageObj.time && msg.from === messageObj.from
+      );
+      if (!duplicate) {
+        this.$set(this.chatMessagesByStudent, studentId, [...existing, messageObj]);
+      }
+
+      if (conversationId) {
+        this.$set(this.chatConversationIdByStudent, studentId, conversationId);
+        if (this.chatStudent && String(this.chatStudent.id) === String(studentId)) {
+          this.subscribeToConversation(conversationId);
+        }
+      }
+    },
     scrollToBottom() {
       if (this.$refs.chatBox) {
         this.$refs.chatBox.scrollTop = this.$refs.chatBox.scrollHeight;
@@ -396,11 +532,13 @@ export default {
       if (conv.id) {
         this.$set(this.chatConversationIdByStudent, conv.studentId, conv.id);
       }
+      this.initSocketSubscriptions(conv.id);
       this.fetchConversation(conv.studentId, conv.id);
     },
     closeChatModal() {
       this.chatModalOpen = false;
       this.chatDraft = "";
+      this.unsubscribeSocketChannels();
     },
     fetchConversation(studentId, conversationId) {
 
