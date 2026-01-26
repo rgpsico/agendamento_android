@@ -57,6 +57,7 @@
       :contracted-loading="contractedLoading"
       :contracted-error="contractedError"
       :contracted-slots="contractedSlots"
+      :unread-messages-count="unreadMessagesCount"
       :toggle-sidebar="toggleSidebar"
       :close-sidebar="closeSidebar"
       :go-to-tab="goToTab"
@@ -157,6 +158,7 @@
 </template>
 
 <script>
+import { io } from "socket.io-client";
 import LoginScreen from "./components/LoginScreen.vue";
 import ProfessorPortal from "./components/ProfessorPortal.vue";
 import ClientPortal from "./components/ClientPortal.vue";
@@ -164,6 +166,16 @@ import ClientPortal from "./components/ClientPortal.vue";
 const PROD_API_BASE = "https://agendamento.rjpasseios.com.br";
 const API_BASE = PROD_API_BASE;
 const ASSET_BASE = PROD_API_BASE;
+const SOCKET_URL = "https://www.comunidadeppg.com.br:3000";
+const socket = io(SOCKET_URL, {
+  reconnection: true,
+  reconnectionAttempts: 5,
+  timeout: 10000
+});
+
+socket.on("connect", () => console.log("Socket conectado:", socket.id));
+socket.on("connect_error", (err) => console.error("Erro de conexao socket:", err));
+socket.on("disconnect", (reason) => console.log("Socket desconectou:", reason));
 
 const STORAGE = {
   TOKEN: "agenda_token",
@@ -232,6 +244,10 @@ export default {
       authLoading: false,
       clientLoading: false,
       currentTab: "dashboard",
+      unreadMessagesCount: 0,
+      socketUserChannel: "",
+      socketUserHandler: null,
+      socketSeenMessages: {},
       pendingProfessorChat: null,
       teacher: loadStorage(STORAGE.TEACHER, { name: "", email: "" }),
       services: loadStorage(STORAGE.SERVICES, []),
@@ -509,9 +525,69 @@ export default {
       this.fetchCategories();
       this.fetchAppointments();
       this.fetchStudents();
+      this.subscribeToProfessorChannel();
     }
   },
+  beforeDestroy() {
+    this.unsubscribeProfessorChannel();
+  },
   methods: {
+    subscribeToProfessorChannel() {
+      const professorId = loadStorage(STORAGE.PROFESSOR, "");
+      if (!professorId) return;
+
+      const channel = `enviarmensagem${professorId}`;
+      if (this.socketUserChannel === channel) return;
+
+      this.unsubscribeProfessorChannel();
+
+      this.socketUserChannel = channel;
+      this.socketUserHandler = (payload) => this.handleIncomingMessage(payload);
+      socket.on(channel, this.socketUserHandler);
+    },
+    unsubscribeProfessorChannel() {
+      if (this.socketUserChannel && this.socketUserHandler) {
+        socket.off(this.socketUserChannel, this.socketUserHandler);
+        this.socketUserChannel = "";
+        this.socketUserHandler = null;
+      }
+    },
+    handleIncomingMessage(payload) {
+      if (!payload || this.currentTab === "messages") return;
+
+      const text = String(
+        payload.mensagem || payload.body || payload.text || payload.message || ""
+      ).trim();
+      if (!text) return;
+
+      const professorId = loadStorage(STORAGE.PROFESSOR, "");
+      const senderId = String(
+        payload.user_id ||
+          payload.usuario_id ||
+          payload.aluno_id ||
+          payload.alunoId ||
+          payload.sender_id ||
+          payload.remetente_id ||
+          payload.professor_id ||
+          payload.professorId ||
+          ""
+      );
+      if (professorId && senderId && String(senderId) === String(professorId)) {
+        return;
+      }
+
+      const conversationId = String(payload.conversation_id || payload.conversationId || "");
+      const time = String(
+        payload.created_at || payload.createdAt || payload.hora || payload.time || ""
+      );
+      const messageId = payload.id || payload.message_id || payload.mensagem_id || "";
+      const dedupeKey = messageId
+        ? String(messageId)
+        : `${conversationId}|${senderId}|${time}|${text}`;
+      if (this.socketSeenMessages[dedupeKey]) return;
+      this.$set(this.socketSeenMessages, dedupeKey, true);
+      this.unreadMessagesCount += 1;
+    },
     toggleSidebar() {
       this.showSidebar = !this.showSidebar;
     },
@@ -520,6 +596,9 @@ export default {
     },
     goToTab(tab) {
       this.currentTab = tab;
+      if (tab === "messages") {
+        this.unreadMessagesCount = 0;
+      }
       this.showSidebar = false;
       if (tab === "availability" && this.availabilityQuery.date && this.availabilityQuery.serviceId) {
         this.fetchAvailability();
@@ -791,10 +870,12 @@ export default {
           if (data.professor_id) {
             localStorage.setItem(STORAGE.PROFESSOR, data.professor_id);
           }
-          this.isAuthenticated = true;
-          this.activePortal = "professor";
-          this.currentTab = "dashboard";
-          this.teacher = { ...this.teacher, email: this.loginForm.email };
+            this.isAuthenticated = true;
+            this.activePortal = "professor";
+            this.currentTab = "dashboard";
+            this.unreadMessagesCount = 0;
+            this.subscribeToProfessorChannel();
+            this.teacher = { ...this.teacher, email: this.loginForm.email };
           this.fetchServices();
           this.fetchCategories();
           this.fetchAppointments();
@@ -865,6 +946,8 @@ export default {
     },
     logout() {
       this.isAuthenticated = false;
+      this.unreadMessagesCount = 0;
+      this.unsubscribeProfessorChannel();
       localStorage.removeItem(STORAGE.TOKEN);
       localStorage.removeItem(STORAGE.EMPRESA);
       localStorage.removeItem(STORAGE.PROFESSOR);

@@ -154,6 +154,7 @@
           <circle cx="15" cy="10" r="1.3" fill="currentColor"></circle>
         </svg>
         <span>Mensagens</span>
+        <span v-if="unreadMessagesCount" class="nav-badge">{{ unreadMessagesCount }}</span>
       </button>
       <button
         class="bottom-nav-btn"
@@ -382,6 +383,10 @@ export default {
     contractedSlots: {
       type: Array,
       required: true
+    },
+    unreadMessagesCount: {
+      type: Number,
+      default: 0
     },
     toggleSidebar: {
       type: Function,

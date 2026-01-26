@@ -554,6 +554,7 @@ body {
   font-size: 11px;
   padding: 6px 0;
   cursor: pointer;
+  position: relative;
 }
 
 .bottom-nav-btn svg {
@@ -564,6 +565,24 @@ body {
 .bottom-nav-btn.active {
   color: var(--primary);
   font-weight: 600;
+}
+
+.nav-badge {
+  position: absolute;
+  top: -2px;
+  left: 50%;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: #ef4444;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 16px;
+  text-align: center;
+  box-shadow: 0 0 0 2px #fff;
+  transform: translateX(10px);
 }
 
 @media (min-width: 900px) {
