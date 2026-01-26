@@ -222,43 +222,24 @@
       </div>
     </div>
 
-    <div v-if="chatModalOpen" class="modal-overlay" @click.self="closeChatModal">
-      <div class="modal-card chat-modal">
-        <div class="view-header">
-          <div>
-            <h4>Conversar com {{ chatStudentName }}</h4>
-            <p class="view-subtitle">Mensagens diretas com o cliente.</p>
-          </div>
-          <button class="text-btn" @click="closeChatModal">Fechar</button>
-        </div>
-
-        <div class="chat-box" ref="chatContainer">
-          <p v-if="chatLoading" class="hint">Carregando conversa...</p>
-          <p v-else-if="chatError" class="error">{{ chatError }}</p>
-          <p v-else-if="!chatMessages.length" class="hint">Nenhuma mensagem ainda.</p>
-          <div
-            v-for="(msg, index) in chatMessages"
-            :key="index"
-            class="chat-message"
-            :class="msg.from === 'me' ? 'outgoing' : 'incoming'"
-          >
-            <span class="chat-text">{{ msg.text }}</span>
-            <span class="chat-time">{{ msg.time }}</span>
-          </div>
-        </div>
-
-        <form class="chat-input" @submit.prevent="sendChatMessage">
-          <input v-model="chatDraft" type="text" placeholder="Digite sua mensagem" />
-          <button class="primary-btn" type="submit" :disabled="!chatDraft.trim()">Enviar</button>
-        </form>
-      </div>
-    </div>
+    <ProfessorAvailabilityChatModal
+      v-if="chatModalOpen"
+      :open="chatModalOpen"
+      :student-name="chatStudentName"
+      :messages="chatMessages"
+      :loading="chatLoading"
+      :error="chatError"
+      v-model="chatDraft"
+      @close="closeChatModal"
+      @send="sendChatMessage"
+    />
 
   </section>
 </template>
 
 <script>
 import { io } from "socket.io-client";
+import ProfessorAvailabilityChatModal from "./ProfessorAvailabilityChatModal.vue";
 const PROD_API_BASE = "https://agendamento.rjpasseios.com.br";
 const API_BASE = PROD_API_BASE;
 const SOCKET_URL = "https://www.comunidadeppg.com.br:3000";
@@ -363,6 +344,9 @@ function extractConversationId(payload) {
 
 export default {
   name: "ProfessorAvailabilityView",
+  components: {
+    ProfessorAvailabilityChatModal
+  },
   props: {
     availabilityQuery: {
       type: Object,
@@ -1162,62 +1146,6 @@ export default {
   box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
 }
 
-.chat-modal {
-  width: min(720px, 94vw);
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.chat-box {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  padding: 12px;
-  border-radius: 12px;
-  background: #f8f9fb;
-  min-height: 240px;
-  max-height: 420px;
-  overflow-y: auto;
-}
-
-.chat-message {
-  max-width: 70%;
-  padding: 10px 12px;
-  border-radius: 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.chat-message.incoming {
-  align-self: flex-start;
-  background: #ffffff;
-  border: 1px solid #e6e6e6;
-}
-
-.chat-message.outgoing {
-  align-self: flex-end;
-  background: #2c6ee8;
-  color: #ffffff;
-}
-
-.chat-time {
-  font-size: 11px;
-  opacity: 0.7;
-}
-
-.chat-input {
-  display: flex;
-  gap: 12px;
-}
-
-.chat-input input {
-  flex: 1;
-  padding: 10px 12px;
-  border-radius: 10px;
-  border: 1px solid #dcdcdc;
-}
 /* Empty State */
 .empty-state {
   background: white;
