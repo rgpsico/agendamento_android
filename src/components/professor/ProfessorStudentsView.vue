@@ -90,6 +90,8 @@
 </template>
 
 <script>
+import { Capacitor } from "@capacitor/core";
+import { LocalNotifications } from "@capacitor/local-notifications";
 import { io } from "socket.io-client";
 import ProfessorAvailabilityChatModal from "./ProfessorAvailabilityChatModal.vue";
 
@@ -258,7 +260,8 @@ export default {
       socketUserChannel: "",
       socketConversationChannel: "",
       socketUserHandler: null,
-      socketConversationHandler: null
+      socketConversationHandler: null,
+      notificationsReady: false
     };
   },
   computed: {
@@ -272,6 +275,7 @@ export default {
   },
   mounted() {
     this.subscribeToProfessorChannel();
+    this.ensureNotificationsReady();
   },
   beforeDestroy() {
     this.unsubscribeSocketChannels();
@@ -387,11 +391,72 @@ export default {
         this.$set(this.chatMessagesByStudent, studentId, [...existing, messageObj]);
       }
 
+      this.triggerLocalNotification({
+        studentId,
+        conversationId,
+        text,
+        studentName:
+          String(this.chatStudent?.id || "") === String(studentId) ? this.chatStudent?.nome : ""
+      });
+
       if (conversationId) {
         this.$set(this.chatConversationIdByStudent, studentId, conversationId);
         if (this.chatStudent && String(this.chatStudent.id) === String(studentId)) {
           this.subscribeToConversation(conversationId);
         }
+      }
+    },
+    async ensureNotificationsReady() {
+      if (this.notificationsReady) return;
+      if (!Capacitor.isNativePlatform()) return;
+
+      try {
+        const status = await LocalNotifications.checkPermissions();
+        if (status.display !== "granted") {
+          const requested = await LocalNotifications.requestPermissions();
+          if (requested.display !== "granted") return;
+        }
+
+        await LocalNotifications.createChannel({
+          id: "mensagens",
+          name: "Mensagens",
+          description: "Notificacoes de novas mensagens",
+          importance: 4,
+          visibility: 1,
+          vibration: true
+        });
+      } catch (error) {
+        console.warn("LocalNotifications indisponivel:", error);
+        return;
+      }
+
+      this.notificationsReady = true;
+    },
+    async triggerLocalNotification({ studentId, conversationId, text, studentName }) {
+      await this.ensureNotificationsReady();
+      if (!this.notificationsReady) return;
+
+      const title = studentName ? `Nova mensagem de ${studentName}` : "Nova mensagem";
+      const body = text.length > 180 ? `${text.slice(0, 177)}...` : text;
+      const safeId = Number(Date.now() % 2147483647);
+
+      try {
+        await LocalNotifications.schedule({
+          notifications: [
+            {
+              id: safeId,
+              title,
+              body,
+              channelId: "mensagens",
+              extra: {
+                studentId,
+                conversationId
+              }
+            }
+          ]
+        });
+      } catch (error) {
+        console.warn("Falha ao enviar notificacao local:", error);
       }
     },
     formatDatePtBr(value) {
