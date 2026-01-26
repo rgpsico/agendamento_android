@@ -345,6 +345,7 @@ export default {
       if (!this.studentId) return;
 
       const channel = `enviarmensagem${this.studentId}`;
+      console.log("Subscribing to user channel:", channel);
       if (this.socketUserChannel === channel) return;
 
       this.unsubscribeUserChannel();
@@ -363,6 +364,7 @@ export default {
       this.unsubscribeConversationChannel();
 
       const channel = `conversa_${cleanId}`;
+      console.log("Subscribing to conversation channel:", channel);
       this.socketConversationChannel = channel;
 
       socket.emit("join", channel);
