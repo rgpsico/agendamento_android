@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "67661308275",
+    "project_id": "agendamento-push",
+    "storage_bucket": "agendamento-push.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:67661308275:android:92d138989cf15bbad96506",
+        "android_client_info": {
+          "package_name": "com.rjpasseios.agendamento"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDMpMoKiLBWqVHYGPd2AgXcAD1aOAIDa-A"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
