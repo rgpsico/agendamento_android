@@ -232,7 +232,7 @@
           <button class="text-btn" @click="closeChatModal">Fechar</button>
         </div>
 
-        <div class="chat-box">
+        <div class="chat-box" ref="chatContainer">
           <p v-if="chatLoading" class="hint">Carregando conversa...</p>
           <p v-else-if="chatError" class="error">{{ chatError }}</p>
           <p v-else-if="!chatMessages.length" class="hint">Nenhuma mensagem ainda.</p>
@@ -500,6 +500,21 @@ export default {
     }
   },
   methods: {
+    scrollToBottom(smooth = false) {
+      this.$nextTick(() => {
+        const container = this.$refs.chatContainer;
+        if (!container) return;
+
+        if (smooth) {
+          container.scrollTo({
+            top: container.scrollHeight,
+            behavior: 'smooth'
+          });
+        } else {
+          container.scrollTop = container.scrollHeight;
+        }
+      });
+    },
     initSocketSubscriptions(conversationId) {
       this.subscribeToProfessorChannel();
       if (conversationId) {
@@ -556,9 +571,17 @@ export default {
       this.unsubscribeUserChannel();
       this.unsubscribeConversationChannel();
     },
+    scrollToBottom() {
+    this.$nextTick(() => {
+      if (!this.$refs.chatContainer) return;
+      
+      const container = this.$refs.chatContainer;
+      container.scrollTop = container.scrollHeight;
+    });
+  },
     handleIncomingMessage(payload) {
       if (!payload) return;
-
+      this.scrollToBottom();
       console.log("Mensagem recebida via socket:", payload);
 
       const text = String(
@@ -604,8 +627,14 @@ export default {
       const duplicate = existing.some(
         (msg) => msg.text === messageObj.text && msg.time === messageObj.time && msg.from === messageObj.from
       );
-      if (!duplicate) {
-        this.$set(this.chatMessagesByStudent, studentId, [...existing, messageObj]);
+     if (!duplicate) {
+        const newMessages = [...existing, messageObj];
+        this.$set(this.chatMessagesByStudent, studentId, newMessages);
+
+        // Rolar para baixo SOMENTE se o chat desse aluno estiver aberto
+        if (this.chatModalOpen && String(this.chatStudent?.id) === String(studentId)) {
+          this.scrollToBottom(true); // smooth = true para ficar mais bonito
+        }
       }
 
       if (conversationId) {
@@ -807,6 +836,7 @@ export default {
           if (newConversationId) {
             this.$set(this.chatConversationIdByStudent, studentId, newConversationId);
           }
+            this.scrollToBottom();
         })
         .catch((error) => {
           this.chatError = error.message || "Erro ao enviar mensagem.";
