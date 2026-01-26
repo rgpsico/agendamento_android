@@ -202,7 +202,7 @@ body {
 }
 
 .client-layout .content {
-  padding-bottom: 90px;
+  padding-bottom: calc(90px + env(safe-area-inset-bottom));
 }
 
 .client-layout .topbar-spacer {
@@ -219,7 +219,7 @@ body {
 }
 
 .professor-layout .content {
-  padding-bottom: 90px;
+  padding-bottom: calc(90px + env(safe-area-inset-bottom));
 }
 
 .professor-layout .topbar-spacer {
@@ -468,7 +468,7 @@ body {
   align-items: center;
   justify-content: center;
   padding: 20px;
-  z-index: 5;
+  z-index: 1000;
 }
 
 .modal-card {
@@ -513,7 +513,8 @@ body {
   left: 0;
   right: 0;
   bottom: 0;
-  height: 64px;
+  height: calc(64px + env(safe-area-inset-bottom));
+  padding-bottom: env(safe-area-inset-bottom);
   background: var(--card);
   border-top: 1px solid var(--border);
   display: grid;
