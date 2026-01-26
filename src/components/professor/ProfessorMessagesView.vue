@@ -164,7 +164,7 @@
 
 <script>
 const PROD_API_BASE = "https://agendamento.rjpasseios.com.br";
-const API_BASE = PROD_API_BASE;
+const API_BASE = process.env.NODE_ENV === "production" ? PROD_API_BASE : "";
 
 const STORAGE = {
   TOKEN: "agenda_token",
@@ -393,13 +393,17 @@ export default {
       this.chatModalOpen = true;
       this.chatDraft = "";
       this.chatError = "";
-      this.fetchConversation(conv.studentId);
+      if (conv.id) {
+        this.$set(this.chatConversationIdByStudent, conv.studentId, conv.id);
+      }
+      this.fetchConversation(conv.studentId, conv.id);
     },
     closeChatModal() {
       this.chatModalOpen = false;
       this.chatDraft = "";
     },
-    fetchConversation(studentId) {
+    fetchConversation(studentId, conversationId) {
+
       const empresaId = resolveEmpresaId();
       if (!studentId || !empresaId) {
         this.chatError = "Professor não encontrado.";
@@ -407,17 +411,22 @@ export default {
       }
       this.chatLoading = true;
       const params = new URLSearchParams({
-        empresa_id: empresaId,
-        user_id: String(studentId)
+        empresa_id: empresaId
       });
+      if (conversationId) {
+        params.set("conversation_id", String(conversationId));
+      }
       const professorId = resolveProfessorId();
       if (professorId) {
-        params.set("professor_id", professorId);
+        params.set("user_id", professorId);
       }
-      fetch(`${API_BASE}/api/conversations?${params.toString()}`, {
+      fetch(`https://agendamento.rjpasseios.com.br/api/listarmensagembyidconversaprof?${params.toString()}`, {
         headers: {
+           Accept: "application/json",  
           "Content-Type": "application/json",
+          
           ...authHeaders()
+          
         }
       })
         .then(async (response) => {
