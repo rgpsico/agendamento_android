@@ -436,6 +436,9 @@ export default {
           payload.professorId ||
           ""
       );
+      if (professorId && senderId && String(senderId) === String(professorId)) {
+        return;
+      }
       const candidateStudentId =
         payload.aluno_id ||
         payload.alunoId ||
