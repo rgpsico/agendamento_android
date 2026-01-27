@@ -17,8 +17,25 @@ async function setupPushNotifications() {
 
   await PushNotifications.register();
 
-  PushNotifications.addListener("registration", (token) => {
+  PushNotifications.addListener("registration", async (token) => {
     console.log("🔥 FCM TOKEN:", token.value);
+
+    try {
+      await fetch("https://agendamento.rjpasseios.com.br/api/device/token", {
+        method: "POST",
+        headers: {
+          "Accept": "application/json",
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${localStorage.getItem("token")}`
+        },
+        body: JSON.stringify({
+          fcm_token: token.value,
+          platform: Capacitor.getPlatform()
+        })
+      });
+    } catch (err) {
+      console.error("❌ Erro ao salvar token:", err);
+    }
   });
 
   PushNotifications.addListener("registrationError", (err) => {
