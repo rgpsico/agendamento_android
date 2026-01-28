@@ -18,6 +18,8 @@ async function setupPushNotifications() {
   await PushNotifications.register();
 
   PushNotifications.addListener("registration", async (token) => {
+    localStorage.setItem("agenda_fcm_token", token.value);
+    localStorage.setItem("agenda_fcm_platform", Capacitor.getPlatform());
     console.log("🔥 FCM TOKEN:", token.value);
 
     try {

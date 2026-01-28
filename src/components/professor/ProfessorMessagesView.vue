@@ -553,7 +553,7 @@ export default {
       }
       this.loading = true;
       this.error = "";
-      fetch(`${API_BASE}/api/conversations/lista?${params.toString()}`, {
+      fetch(`https://agendamento.rjpasseios.com.br/api/conversations/lista?${params.toString()}`, {
         headers: {
           "Content-Type": "application/json",
           ...authHeaders()

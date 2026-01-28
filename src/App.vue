@@ -188,7 +188,9 @@ const STORAGE = {
   CLIENT_TOKEN: "agenda_client_token",
   CLIENT_PROFILE: "agenda_client_profile",
   CLIENT_BOOKINGS: "agenda_client_bookings",
-  CLIENT_COMPANY: "agenda_client_company_id"
+  CLIENT_COMPANY: "agenda_client_company_id",
+  FCM_TOKEN: "agenda_fcm_token",
+  FCM_PLATFORM: "agenda_fcm_platform"
 };
 
 
@@ -532,6 +534,14 @@ export default {
     this.unsubscribeProfessorChannel();
   },
   methods: {
+    getFcmPayload() {
+      const fcmToken = localStorage.getItem(STORAGE.FCM_TOKEN);
+      if (!fcmToken) return {};
+      return {
+        fcm_token: fcmToken,
+        platform: localStorage.getItem(STORAGE.FCM_PLATFORM) || "android"
+      };
+    },
     subscribeToProfessorChannel() {
       const professorId = loadStorage(STORAGE.PROFESSOR, "");
       if (!professorId) return;
@@ -838,58 +848,64 @@ export default {
       this.clientProfileSaved = true;
     },
     handleLogin() {
-      this.loginError = "";
-      if (!this.loginForm.email || !this.loginForm.password) {
-        this.loginError = "Informe email e senha.";
-        return;
+  this.loginError = "";
+  if (!this.loginForm.email || !this.loginForm.password) {
+    this.loginError = "Informe email e senha.";
+    return;
+  }
+
+  this.authLoading = true;
+
+  const fcmToken = localStorage.getItem("agenda_fcm_token");
+  const fcmPlatform = localStorage.getItem("agenda_fcm_platform") || "android";
+
+  const payload = {
+    email: this.loginForm.email,
+    password: this.loginForm.password,
+    ...(fcmToken ? { fcm_token: fcmToken, platform: fcmPlatform } : {})
+  };
+
+  fetch(API_BASE + "/api/login", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload)
+  })
+    .then(async (response) => {
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || "Falha na autenticacao.");
+      if (!data.token) throw new Error("Token nao recebido.");
+
+      localStorage.setItem(STORAGE.TOKEN, data.token);
+      if (data.empresa_id) {
+        localStorage.setItem(STORAGE.EMPRESA, data.empresa_id);
+        this.serviceForm.empresa_id = data.empresa_id;
       }
-      this.authLoading = true;
-      fetch(API_BASE+"/api/login", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          email: this.loginForm.email,
-          password: this.loginForm.password
-        })
-      })
-        .then(async (response) => {
-          const data = await response.json().catch(() => ({}));
-          if (!response.ok) {
-            throw new Error(data.error || "Falha na autenticacao.");
-          }
-          if (!data.token) {
-            throw new Error("Token nao recebido.");
-          }
-          localStorage.setItem(STORAGE.TOKEN, data.token);
-          if (data.empresa_id) {
-            localStorage.setItem(STORAGE.EMPRESA, data.empresa_id);
-            this.serviceForm.empresa_id = data.empresa_id;
-          }
-          if (data.professor_id) {
-            localStorage.setItem(STORAGE.PROFESSOR, data.professor_id);
-          }
-            this.isAuthenticated = true;
-            this.activePortal = "professor";
-            this.currentTab = "dashboard";
-            this.unreadMessagesCount = 0;
-            this.subscribeToProfessorChannel();
-            this.teacher = { ...this.teacher, email: this.loginForm.email };
-          this.fetchServices();
-          this.fetchCategories();
-          this.fetchAppointments();
-          this.fetchStudents();
-          this.loginForm.email = "";
-          this.loginForm.password = "";
-        })
-        .catch((error) => {
-          this.loginError = error.message || "Erro ao autenticar.";
-        })
-        .finally(() => {
-          this.authLoading = false;
-        });
-    },
+      if (data.professor_id) {
+        localStorage.setItem(STORAGE.PROFESSOR, data.professor_id);
+      }
+
+      this.isAuthenticated = true;
+      this.activePortal = "professor";
+      this.currentTab = "dashboard";
+      this.unreadMessagesCount = 0;
+      this.subscribeToProfessorChannel();
+      this.teacher = { ...this.teacher, email: this.loginForm.email };
+
+      this.fetchServices();
+      this.fetchCategories();
+      this.fetchAppointments();
+      this.fetchStudents();
+      this.loginForm.email = "";
+      this.loginForm.password = "";
+    })
+    .catch((error) => {
+      this.loginError = error.message || "Erro ao autenticar.";
+    })
+    .finally(() => {
+      this.authLoading = false;
+    });
+},
+
     handleClientLogin() {
       this.clientLoginError = "";
       if (!this.clientLoginForm.email || !this.clientLoginForm.password) {
@@ -897,15 +913,17 @@ export default {
         return;
       }
       this.clientLoading = true;
+      const payload = {
+        email: this.clientLoginForm.email,
+        password: this.clientLoginForm.password,
+        ...this.getFcmPayload()
+      };
       fetch(API_BASE + "/api/login", {
         method: "POST",
         headers: {
           "Content-Type": "application/json"
         },
-        body: JSON.stringify({
-          email: this.clientLoginForm.email,
-          password: this.clientLoginForm.password
-        })
+        body: JSON.stringify(payload)
       })
         .then(async (response) => {
           const data = await response.json().catch(() => ({}));
