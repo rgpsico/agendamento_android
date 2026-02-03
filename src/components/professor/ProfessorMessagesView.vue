@@ -230,6 +230,13 @@ function formatMessageTime(value) {
   return `${hours}:${minutes}`;
 }
 
+function toTimestamp(value) {
+  if (!value) return 0;
+  const date = new Date(value);
+  const ts = date.getTime();
+  return Number.isNaN(ts) ? 0 : ts;
+}
+
 function extractMessages(payload) {
   if (!payload) return [];
   if (Array.isArray(payload)) return payload;
@@ -300,14 +307,17 @@ function normalizeConversation(conv) {
     "";
   const last = conv.last_message || {};
   const lastMessage = last.body || last.mensagem || last.message || last.text || "-";
-  const lastMessageTime = formatDateTimePtBr(last.created_at || last.data_hora || "");
+  const lastMessageAtRaw = last.created_at || last.data_hora || "";
+  const lastMessageTime = formatDateTimePtBr(lastMessageAtRaw);
+  const lastMessageAt = toTimestamp(lastMessageAtRaw);
   return {
     id: conv.id,
     studentId,
     studentName,
     studentEmail,
     lastMessage,
-    lastMessageTime
+    lastMessageTime,
+    lastMessageAt
   };
 }
 
@@ -397,6 +407,13 @@ export default {
       this.$nextTick(() => {
         this.scrollToBottom();
       });
+    },
+    chatLoading(isLoading) {
+      if (!isLoading) {
+        this.$nextTick(() => {
+          this.scrollToBottom();
+        });
+      }
     },
     chatModalOpen(isOpen) {
       if (isOpen) {
@@ -523,6 +540,39 @@ export default {
           this.subscribeToConversation(conversationId);
         }
       }
+
+      const lastMessageAt = toTimestamp(
+        payload.created_at || payload.createdAt || payload.data_hora || payload.hora || new Date()
+      );
+      const rawLastTime =
+        payload.created_at || payload.createdAt || payload.data_hora || payload.hora || new Date();
+      const lastMessageTime =
+        formatDateTimePtBr(rawLastTime) || formatMessageTime(rawLastTime);
+      const updated = {
+        id: conversationId || this.chatConversationIdByStudent[studentId] || "",
+        studentId,
+        studentName: this.chatStudent?.name || this.chatStudent?.nome || "Aluno",
+        studentEmail: "",
+        lastMessage: text,
+        lastMessageTime,
+        lastMessageAt
+      };
+      const existingIndex = this.conversations.findIndex(
+        (conv) => String(conv.studentId) === String(studentId)
+      );
+      if (existingIndex >= 0) {
+        const merged = { ...this.conversations[existingIndex], ...updated };
+        const next = [
+          merged,
+          ...this.conversations.filter((_, index) => index !== existingIndex)
+        ];
+        next.sort((a, b) => (b.lastMessageAt || 0) - (a.lastMessageAt || 0));
+        this.conversations = next;
+      } else {
+        const next = [updated, ...this.conversations];
+        next.sort((a, b) => (b.lastMessageAt || 0) - (a.lastMessageAt || 0));
+        this.conversations = next;
+      }
     },
     scrollToBottom() {
       this.$nextTick(() => {
@@ -574,6 +624,7 @@ export default {
             seen.add(key);
             deduped.push(conv);
           });
+          deduped.sort((a, b) => (b.lastMessageAt || 0) - (a.lastMessageAt || 0));
           this.conversations = deduped;
         })
         .catch((error) => {
@@ -592,6 +643,9 @@ export default {
       this.chatModalOpen = true;
       this.chatDraft = "";
       this.chatError = "";
+      this.$nextTick(() => {
+        this.scrollToBottom();
+      });
       const existingConversationId =
         conv.id || this.chatConversationIdByStudent[conv.studentId] || "";
       if (existingConversationId) {
@@ -648,6 +702,9 @@ export default {
           }
           const normalized = normalizeMessages(extractMessages(conversation));
           this.$set(this.chatMessagesByStudent, studentId, normalized);
+          this.$nextTick(() => {
+            this.scrollToBottom();
+          });
         })
         .catch((error) => {
           this.chatError = error.message || "Erro ao carregar conversa.";
