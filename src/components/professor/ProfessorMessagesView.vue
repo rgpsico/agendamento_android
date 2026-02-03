@@ -51,6 +51,7 @@
           v-for="conv in conversations"
           :key="conv.id"
           class="conversation-card"
+          :class="{ unread: conv.lastMessageOpened === false }"
           @click="openConversation(conv)"
         >
           <div class="avatar">
@@ -310,6 +311,15 @@ function normalizeConversation(conv) {
   const lastMessageAtRaw = last.created_at || last.data_hora || "";
   const lastMessageTime = formatDateTimePtBr(lastMessageAtRaw);
   const lastMessageAt = toTimestamp(lastMessageAtRaw);
+  const lastMessageOpenedRaw =
+    conv.last_message_is_opened ??
+    last.is_opened ??
+    last.lida ??
+    last.read ??
+    last.aberta ??
+    null;
+  const lastMessageOpened =
+    lastMessageOpenedRaw === null ? null : Boolean(Number.isNaN(lastMessageOpenedRaw) ? lastMessageOpenedRaw : Number(lastMessageOpenedRaw));
   return {
     id: conv.id,
     studentId,
@@ -317,7 +327,8 @@ function normalizeConversation(conv) {
     studentEmail,
     lastMessage,
     lastMessageTime,
-    lastMessageAt
+    lastMessageAt,
+    lastMessageOpened
   };
 }
 
@@ -643,6 +654,7 @@ export default {
       this.chatModalOpen = true;
       this.chatDraft = "";
       this.chatError = "";
+      this.markLastMessageOpened();
       this.$nextTick(() => {
         this.scrollToBottom();
       });
@@ -658,10 +670,30 @@ export default {
       this.initSocketSubscriptions("");
       this.$set(this.chatMessagesByStudent, conv.studentId, []);
     },
+    markLastMessageOpened() {
+      const empresaId = resolveEmpresaId();
+      const professorId = resolveProfessorId();
+      if (!empresaId || !professorId) return;
+
+      fetch(`${API_BASE}/api/conversations/last/opened`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...authHeaders()
+        },
+        body: JSON.stringify({
+          empresa_id: empresaId,
+          professor_user_id: professorId
+        })
+      }).catch((error) => {
+        console.warn("Falha ao marcar conversa como aberta:", error);
+      });
+    },
     closeChatModal() {
       this.chatModalOpen = false;
       this.chatDraft = "";
       this.unsubscribeSocketChannels();
+      this.fetchConversations();
     },
     fetchConversation(studentId, conversationId) {
 
@@ -899,38 +931,6 @@ export default {
   margin: 0;
   font-size: 18px;
   font-weight: 600;
-  color: #334155;
-}
-
-.empty-state p {
-  margin: 0;
-  color: #64748b;
-}
-
-.conversations-grid {
-  display: grid;
-  gap: 12px;
-}
-
-.conversation-card {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  padding: 16px;
-  background: white;
-  border: 1px solid #e2e8f0;
-  border-radius: 14px;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.conversation-card:hover {
-  border-color: #2c6ee8;
-  transform: translateX(4px);
-  box-shadow: 0 4px 16px rgba(44, 110, 232, 0.1);
-}
-
-.avatar {
   width: 48px;
   height: 48px;
   border-radius: 50%;
@@ -965,6 +965,11 @@ export default {
   font-size: 16px;
   font-weight: 600;
   color: #1e293b;
+}
+
+.conversation-card.unread .student-name,
+.conversation-card.unread .last-message {
+  font-weight: 800;
 }
 
 .student-email {
